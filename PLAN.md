@@ -36,7 +36,7 @@ multiple reads are not a transaction. No server revision ordering is implemented
 Status: implemented, verified, and accepted by the user's instruction to fix incrementality
 and commit the current work. Slice 3 has not started.
 
-## Current slice: generator incrementality
+## Completed slice: generator incrementality
 
 Approved: fix per-provider analysis and model equality; commit if tests pass.
 
@@ -56,12 +56,25 @@ unchanged results from invalidating downstream validation. Diagnostic reporting 
 the current compilation only at the output boundary to bind cached issues to current trees.
 This verifies incremental behavior, not throughput or IDE performance benchmarks.
 
-Status: implemented and verified. User authorized the first local commit of TinyFlags;
-do not start source emission as part of this slice.
+Status: implemented, verified, and committed in `a00f008`.
 
 The interface marker also requires semantic candidate checks; an attribute enables Roslyn's
 optimized attribute lookup but would change the agreed declaration API. Keep the interface
 unless the user approves a contract change.
+
+## Current slice: explicit discovery phase
+
+Discovery is the initial syntactic filter, followed by semantic Analysis. Move the candidate
+filter into `Discovery` and let the generator entry point connect both callbacks. Keep marker
+resolution, partial selection, and every Roslyn symbol inside `Analysis`.
+
+Rename the validation output to `FeatureValidationResult` and the pipeline variable to
+`validation` so names match their phases. No new contracts or generated access classes.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 64 existing
+tests, including incremental caching and partial behavior. Symbol use remains inside Analysis.
+Status: implemented and verified; included in the requested commit. Stop for review before
+starting generated access classes.
 
 ## Completed slice: 0 - workspace bootstrap
 

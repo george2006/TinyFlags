@@ -11,7 +11,30 @@ namespace TinyFlags.SourceGen.Analysis;
 
 internal sealed class FeatureProviderAnalyzer
 {
-    public FeatureProviderAnalysis Analyze(
+    public FeatureProviderAnalysis? Analyze(
+        GeneratorSyntaxContext context,
+        CancellationToken cancellationToken)
+    {
+        var declaration = (TypeDeclarationSyntax)context.Node;
+        var provider = context.SemanticModel.GetDeclaredSymbol(declaration, cancellationToken) as INamedTypeSymbol;
+        var compilation = context.SemanticModel.Compilation;
+        var marker = compilation.GetTypeByMetadataName("TinyFlags.IFeatureProvider");
+
+        if (provider is null || provider.TypeKind == TypeKind.Interface || marker is null)
+        {
+            return null;
+        }
+
+        if (!provider.AllInterfaces.Any(contract => SymbolEqualityComparer.Default.Equals(contract, marker))
+            || !IsFirstCandidate(provider, declaration, cancellationToken))
+        {
+            return null;
+        }
+
+        return AnalyzeProvider(compilation, provider, cancellationToken);
+    }
+
+    private static FeatureProviderAnalysis AnalyzeProvider(
         Compilation compilation,
         INamedTypeSymbol provider,
         CancellationToken cancellationToken)
@@ -32,6 +55,24 @@ internal sealed class FeatureProviderAnalyzer
         return new FeatureProviderAnalysis(
             provider.Name, namespaceName, qualifiedName, IsSupportedProvider(provider),
             ReadLocation(compilation, provider.Locations[0]), properties.ToImmutable());
+    }
+
+    private static bool IsFirstCandidate(
+        INamedTypeSymbol provider,
+        TypeDeclarationSyntax declaration,
+        CancellationToken cancellationToken)
+    {
+        // A partial provider has one pipeline entry, but analysis reads all its members.
+        foreach (var reference in provider.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(cancellationToken) is TypeDeclarationSyntax candidate
+                && candidate.BaseList is not null)
+            {
+                return candidate.SyntaxTree == declaration.SyntaxTree && candidate.Span == declaration.Span;
+            }
+        }
+
+        return false;
     }
 
     private static FeaturePropertyAnalysis AnalyzeProperty(

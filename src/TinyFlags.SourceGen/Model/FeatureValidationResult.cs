@@ -3,9 +3,9 @@ using System.Linq;
 
 namespace TinyFlags.SourceGen.Model;
 
-internal sealed class FeatureDiscoveryResult
+internal sealed class FeatureValidationResult
 {
-    public FeatureDiscoveryResult(
+    public FeatureValidationResult(
         ImmutableArray<FeatureProviderDefinition> providers,
         ImmutableArray<FeatureIssue> diagnostics)
     {
@@ -19,7 +19,7 @@ internal sealed class FeatureDiscoveryResult
 
     public override bool Equals(object? obj)
     {
-        return obj is FeatureDiscoveryResult other
+        return obj is FeatureValidationResult other
             && Providers.SequenceEqual(other.Providers)
             && Diagnostics.SequenceEqual(other.Diagnostics);
     }

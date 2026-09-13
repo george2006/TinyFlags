@@ -96,6 +96,9 @@ tests/TinyFlags.SourceGen.Tests
 ```
 
 The implemented flow is discovery -> analysis -> validation -> definition model.
+`Discovery` performs the initial syntax filter. `Analysis` resolves the marker, combines partial
+members, and extracts flag information. The generator entry point connects these phases through
+Roslyn's syntax predicate and semantic transform.
 Roslyn symbols stay inside `Analysis`. Models and validation have no Roslyn dependencies;
 source positions and issues are plain data. The generator entry point and diagnostic reporter
 adapt these results to Roslyn. Planning and emission come in later slices.

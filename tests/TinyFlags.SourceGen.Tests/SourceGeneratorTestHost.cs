@@ -9,7 +9,7 @@ internal static class SourceGeneratorTestHost
 {
     private static readonly ImmutableArray<MetadataReference> References = CreateReferences();
 
-    public static FeatureDiscoveryResult Discover(params string[] sources)
+    public static FeatureValidationResult Discover(params string[] sources)
     {
         return ReadDefinitions(Run(sources));
     }
@@ -37,16 +37,16 @@ internal static class SourceGeneratorTestHost
         return driver;
     }
 
-    public static FeatureDiscoveryResult ReadDefinitions(GeneratorDriverRunResult run)
+    public static FeatureValidationResult ReadDefinitions(GeneratorDriverRunResult run)
     {
         var steps = Assert.Single(run.Results).TrackedSteps;
         var results = steps.TryGetValue("FeatureValidation", out var validation)
             ? validation.SelectMany(step => step.Outputs)
                 .Where(output => output.Reason != IncrementalStepRunReason.Removed)
-                .Select(output => (FeatureDiscoveryResult)output.Value).ToArray()
-            : Array.Empty<FeatureDiscoveryResult>();
+                .Select(output => (FeatureValidationResult)output.Value).ToArray()
+            : Array.Empty<FeatureValidationResult>();
 
-        return new FeatureDiscoveryResult(
+        return new FeatureValidationResult(
             results.SelectMany(result => result.Providers).ToImmutableArray(),
             results.SelectMany(result => result.Diagnostics).ToImmutableArray());
     }

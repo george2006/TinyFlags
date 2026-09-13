@@ -64,7 +64,9 @@ Use the TinySuite generators as references, not templates to copy wholesale:
 Keep Roslyn discovery and semantic analysis separate from generation planning and C# emission.
 No Roslyn symbols may escape `Analysis`. Models and subsequent phases use our own data,
 including scalar source positions and diagnostic information. Roslyn integration outside
-analysis is limited to generator registration and reporting diagnostics to the compiler.
+analysis is limited to syntax filtering in `Discovery`, generator registration, and reporting
+diagnostics to the compiler. Discovery is the initial syntax filter; Analysis resolves symbols
+and produces plain models. The generator entry point wires both phases together.
 Introduce only the phases and types the agreed behavior needs. A phase does not need an
 interface just because it has a name. Prefer incremental generation and explicit generated
 code over runtime assembly scanning when implementing the generator.

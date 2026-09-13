@@ -6,7 +6,7 @@ namespace TinyFlags.SourceGen.Validation;
 
 internal sealed class FeatureDeclarationValidator
 {
-    public FeatureDiscoveryResult Validate(
+    public FeatureValidationResult Validate(
         FeatureProviderAnalysis analysis,
         CancellationToken cancellationToken)
     {
@@ -16,7 +16,7 @@ internal sealed class FeatureDeclarationValidator
             ? ImmutableArray.Create(FeatureProviderDefinition.FromAnalysis(analysis))
             : ImmutableArray<FeatureProviderDefinition>.Empty;
 
-        return new FeatureDiscoveryResult(providers, issues);
+        return new FeatureValidationResult(providers, issues);
     }
 
     private static ImmutableArray<FeatureIssue> ValidateProvider(
