@@ -30,6 +30,11 @@ internal sealed class FeatureDeclarationValidator
 
         var diagnostics = ImmutableArray.CreateBuilder<FeatureIssue>();
 
+        if (analysis.HasGeneratedNameConflict)
+        {
+            diagnostics.Add(new FeatureIssue("TFG004", analysis.Name, analysis.Location));
+        }
+
         foreach (var property in analysis.Properties)
         {
             cancellationToken.ThrowIfCancellationRequested();

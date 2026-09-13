@@ -23,6 +23,8 @@ public sealed class IncrementalGenerationTests
         Assert.Equal(new[] { IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached },
             Reasons(run, "FeatureValidation"));
         Assert.Equal(2, SourceGeneratorTestHost.ReadDefinitions(run).Providers.Length);
+        Assert.Equal(new[] { IncrementalStepRunReason.Cached, IncrementalStepRunReason.Cached },
+            Reasons(run, "FeatureGeneration"));
     }
 
     [Fact]
@@ -35,6 +37,8 @@ public sealed class IncrementalGenerationTests
         var providers = SourceGeneratorTestHost.ReadDefinitions(run).Providers;
         Assert.False((bool)Assert.Single(providers[0].Features).DefaultValue);
         Assert.Equal("Find", Assert.Single(providers[1].Features).DefaultValue);
+        Assert.Equal(new[] { IncrementalStepRunReason.Modified, IncrementalStepRunReason.Cached },
+            Reasons(run, "FeatureGeneration"));
     }
 
     [Fact]
@@ -52,6 +56,7 @@ public sealed class IncrementalGenerationTests
 
         Assert.Equal(IncrementalStepRunReason.Unchanged, Assert.Single(Reasons(run, "FeatureAnalysis")));
         Assert.Equal(IncrementalStepRunReason.Cached, Assert.Single(Reasons(run, "FeatureValidation")));
+        Assert.Equal(IncrementalStepRunReason.Cached, Assert.Single(Reasons(run, "FeatureGeneration")));
     }
 
     [Fact]
@@ -101,6 +106,8 @@ public sealed class IncrementalGenerationTests
         Assert.Empty(run.Diagnostics);
         Assert.Equal("Search", Assert.Single(SourceGeneratorTestHost.ReadDefinitions(run).Providers).Name);
         Assert.Contains(IncrementalStepRunReason.Removed, Reasons(run, "FeatureValidation"));
+        Assert.Equal("SearchFeatureFlags.g.cs",
+            Assert.Single(Assert.Single(run.Results).GeneratedSources).HintName);
     }
 
     [Fact]
@@ -122,6 +129,7 @@ public sealed class IncrementalGenerationTests
 
         Assert.Equal(IncrementalStepRunReason.Modified, Assert.Single(Reasons(run, "FeatureAnalysis")));
         Assert.Equal(IncrementalStepRunReason.Unchanged, Assert.Single(Reasons(run, "FeatureValidation")));
+        Assert.Equal(IncrementalStepRunReason.Cached, Assert.Single(Reasons(run, "FeatureGeneration")));
         Assert.True((bool)Assert.Single(Assert.Single(
             SourceGeneratorTestHost.ReadDefinitions(run).Providers).Features).DefaultValue);
     }
@@ -171,6 +179,16 @@ public sealed class IncrementalGenerationTests
         Assert.Empty(run.Diagnostics);
         Assert.True((bool)Assert.Single(Assert.Single(
             SourceGeneratorTestHost.ReadDefinitions(run).Providers).Features).DefaultValue);
+    }
+
+    [Fact]
+    public void Introducing_a_conflicting_type_removes_previously_generated_source()
+    {
+        var run = RunEdit(new[] { Checkout }, 0, Checkout + "\npublic class CheckoutFeatureFlags { }");
+
+        Assert.Equal("TFG004", Assert.Single(run.Diagnostics).Id);
+        Assert.Empty(Assert.Single(run.Results).GeneratedSources);
+        Assert.Contains(IncrementalStepRunReason.Removed, Reasons(run, "FeatureGeneration"));
     }
 
     private static GeneratorDriverRunResult RunEdit(string[] sources, int editedIndex, string editedSource)

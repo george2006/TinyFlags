@@ -4,6 +4,14 @@ namespace TinyFlags.SourceGen.Diagnostics;
 
 internal static class FeatureDiagnostics
 {
+    public static readonly DiagnosticDescriptor GeneratedNameConflict = new(
+        "TFG004",
+        "Generated feature class name conflicts",
+        "Provider '{0}' cannot generate its FeatureFlags class because the name conflicts with an existing type, namespace, or feature property",
+        "TinyFlags",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor UnsupportedProvider = new(
         "TFG001",
         "Unsupported feature provider",

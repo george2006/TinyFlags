@@ -1,7 +1,10 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using TinyFlags.SourceGen.Analysis;
 using TinyFlags.SourceGen.Diagnostics;
 using TinyFlags.SourceGen.Discovery;
+using TinyFlags.SourceGen.Generation;
 using TinyFlags.SourceGen.Validation;
 
 namespace TinyFlags.SourceGen;
@@ -23,6 +26,15 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
         var validation = analysis.Select(static (provider, cancellationToken) =>
             new FeatureDeclarationValidator().Validate(provider, cancellationToken))
             .WithTrackingName("FeatureValidation");
+
+        var sources = validation
+            .SelectMany(static (result, _) => result.Providers)
+            .Select(static (provider, cancellationToken) =>
+                new FeatureGeneration().Generate(provider, cancellationToken))
+            .WithTrackingName("FeatureGeneration");
+
+        context.RegisterSourceOutput(sources, static (output, source) =>
+            output.AddSource(source.HintName, SourceText.From(source.Source, Encoding.UTF8)));
 
         // Rebind cached issues to the current compilation's syntax trees before reporting.
         context.RegisterSourceOutput(validation.Combine(context.CompilationProvider), static (output, input) =>

@@ -34,7 +34,7 @@ The runtime checks include replacement, defaults, caller mutation isolation, rej
 partial publication, and concurrent reads/updates. Individual reads observe one snapshot;
 multiple reads are not a transaction. No server revision ordering is implemented in this slice.
 Status: implemented, verified, and accepted by the user's instruction to fix incrementality
-and commit the current work. Slice 3 has not started.
+and commit the current work.
 
 ## Completed slice: generator incrementality
 
@@ -62,7 +62,7 @@ The interface marker also requires semantic candidate checks; an attribute enabl
 optimized attribute lookup but would change the agreed declaration API. Keep the interface
 unless the user approves a contract change.
 
-## Current slice: explicit discovery phase
+## Completed slice: explicit discovery phase
 
 Discovery is the initial syntactic filter, followed by semantic Analysis. Move the candidate
 filter into `Discovery` and let the generator entry point connect both callbacks. Keep marker
@@ -73,8 +73,31 @@ Rename the validation output to `FeatureValidationResult` and the pipeline varia
 
 Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 64 existing
 tests, including incremental caching and partial behavior. Symbol use remains inside Analysis.
-Status: implemented and verified; included in the requested commit. Stop for review before
-starting generated access classes.
+Status: implemented, verified, committed in `d03722a`, and approved by the instruction to continue.
+
+## Completed slice: 3 - generated access classes
+
+Approved: generate `NameFeatureFlags` classes backed by `FeatureValues`, with explicit phases.
+The user confirmed that `Generation/` contains planning and emission, coordinated by
+`FeatureGeneration`. It consumes validated definitions and returns source text without Roslyn.
+
+Implemented: public sealed access classes in the declaration namespace, a constructor receiving
+the concrete store, typed bool/string getters and declared-default fallback. Each read consults
+the current snapshot. Source emission escapes identifiers and string constants, chooses a
+nonconflicting backing field, and handles properties hiding object members. Analysis detects
+generated class name conflicts; validation reports `TFG004` and suppresses that provider.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed 85 tests
+(75 generator, 10 runtime). Generated consumers are compiled and executed to verify defaults,
+snapshot updates, partial declarations, namespace isolation, escaped identifiers/string values,
+backing-field collisions, object member hiding and null constructor input. Incremental checks
+now cover generation reuse and removal when declarations become invalid or conflict.
+
+Status: implemented, verified, and explicitly approved by the user at the end of the session.
+No catalog, DI registration, networking, or NuGet packaging in this slice.
+
+Next session: agree the catalog contract for slice 4 before implementation. The user has ended
+today's session; no further feature work is authorized for this session.
 
 ## Completed slice: 0 - workspace bootstrap
 

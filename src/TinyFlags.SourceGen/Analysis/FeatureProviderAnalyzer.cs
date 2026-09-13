@@ -54,6 +54,7 @@ internal sealed class FeatureProviderAnalyzer
         var qualifiedName = provider.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat);
         return new FeatureProviderAnalysis(
             provider.Name, namespaceName, qualifiedName, IsSupportedProvider(provider),
+            HasGeneratedNameConflict(compilation, provider),
             ReadLocation(compilation, provider.Locations[0]), properties.ToImmutable());
     }
 
@@ -132,6 +133,22 @@ internal sealed class FeatureProviderAnalyzer
         var hasNoBaseClass = provider.BaseType?.SpecialType == SpecialType.System_Object;
 
         return isConcreteClass && isOrdinaryClass && isTopLevelNonGeneric && hasNoBaseClass;
+    }
+
+    private static bool HasGeneratedNameConflict(Compilation compilation, INamedTypeSymbol provider)
+    {
+        var generatedName = provider.Name + "FeatureFlags";
+        var namespaceName = provider.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : provider.ContainingNamespace.ToDisplayString(new SymbolDisplayFormat(
+                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces));
+        var qualifiedName = string.IsNullOrEmpty(namespaceName)
+            ? generatedName
+            : namespaceName + "." + generatedName;
+
+        return compilation.Assembly.GetTypeByMetadataName(qualifiedName) is not null
+            || provider.ContainingNamespace.GetNamespaceMembers().Any(member => member.Name == generatedName)
+            || provider.GetMembers(generatedName).OfType<IPropertySymbol>().Any();
     }
 
     private static bool HasSupportedPropertyShape(IPropertySymbol property)

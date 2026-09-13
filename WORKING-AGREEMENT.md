@@ -67,6 +67,9 @@ including scalar source positions and diagnostic information. Roslyn integration
 analysis is limited to syntax filtering in `Discovery`, generator registration, and reporting
 diagnostics to the compiler. Discovery is the initial syntax filter; Analysis resolves symbols
 and produces plain models. The generator entry point wires both phases together.
+`Generation/` is an explicit phase receiving validated definitions and returning source text.
+Keep its planning and emission steps in `Generation/Planning/` and `Generation/Emission/`;
+neither depends on Roslyn.
 Introduce only the phases and types the agreed behavior needs. A phase does not need an
 interface just because it has a name. Prefer incremental generation and explicit generated
 code over runtime assembly scanning when implementing the generator.

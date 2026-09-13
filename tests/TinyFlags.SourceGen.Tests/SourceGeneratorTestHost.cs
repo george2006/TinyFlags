@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.Loader;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using TinyFlags.SourceGen.Model;
@@ -30,10 +31,9 @@ internal static class SourceGeneratorTestHost
 
     public static GeneratorDriver Run(GeneratorDriver driver, Compilation compilation)
     {
-        AssertCompiles(compilation);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
-        AssertCompiles(output);
         Assert.Null(Assert.Single(driver.GetRunResult().Results).Exception);
+        AssertCompiles(output);
         return driver;
     }
 
@@ -59,8 +59,32 @@ internal static class SourceGeneratorTestHost
             OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable);
         var compilation = CSharpCompilation.Create("FlagConsumer", trees, References, options);
 
-        AssertCompiles(compilation);
         return compilation;
+    }
+
+    public static T Execute<T>(params string[] sources)
+    {
+        var compilation = CreateCompilation(sources);
+        var driver = CreateDriver().RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
+        Assert.Empty(driver.GetRunResult().Diagnostics);
+        AssertCompiles(output);
+
+        using var stream = new MemoryStream();
+        var emitted = output.Emit(stream);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        stream.Position = 0;
+        var loadContext = new AssemblyLoadContext("FlagConsumer", isCollectible: true);
+
+        try
+        {
+            var assembly = loadContext.LoadFromStream(stream);
+            var run = assembly.GetType("Scenario")!.GetMethod("Run")!;
+            return Assert.IsType<T>(run.Invoke(null, null));
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
     }
 
     private static ImmutableArray<MetadataReference> CreateReferences()

@@ -10,6 +10,7 @@ internal sealed class FeatureProviderAnalysis
         string namespaceName,
         string qualifiedName,
         bool hasSupportedShape,
+        bool hasGeneratedNameConflict,
         SourceLocation location,
         ImmutableArray<FeaturePropertyAnalysis> properties)
     {
@@ -17,6 +18,7 @@ internal sealed class FeatureProviderAnalysis
         NamespaceName = namespaceName;
         QualifiedName = qualifiedName;
         HasSupportedShape = hasSupportedShape;
+        HasGeneratedNameConflict = hasGeneratedNameConflict;
         Location = location;
         Properties = properties;
     }
@@ -29,6 +31,8 @@ internal sealed class FeatureProviderAnalysis
 
     public bool HasSupportedShape { get; }
 
+    public bool HasGeneratedNameConflict { get; }
+
     public SourceLocation Location { get; }
 
     public ImmutableArray<FeaturePropertyAnalysis> Properties { get; }
@@ -40,13 +44,14 @@ internal sealed class FeatureProviderAnalysis
             && Equals(NamespaceName, other.NamespaceName)
             && Equals(QualifiedName, other.QualifiedName)
             && Equals(HasSupportedShape, other.HasSupportedShape)
+            && Equals(HasGeneratedNameConflict, other.HasGeneratedNameConflict)
             && Equals(Location, other.Location)
             && Properties.SequenceEqual(other.Properties);
     }
 
     public override int GetHashCode()
     {
-        var hash = (Name, NamespaceName, QualifiedName, HasSupportedShape, Location).GetHashCode();
+        var hash = (Name, NamespaceName, QualifiedName, HasSupportedShape, HasGeneratedNameConflict, Location).GetHashCode();
 
         foreach (var item in Properties)
         {

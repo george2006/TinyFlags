@@ -5,8 +5,9 @@ Typed feature flag declarations for .NET.
 ## Current behavior
 
 The generator discovers feature providers, reads their flag definitions, and reports unsupported
-declarations at compile time. `FeatureValues` provides local value resolution. Generated access
-classes, networking, dependency injection, and NuGet distribution are not implemented yet.
+declarations at compile time. It generates typed access classes backed by `FeatureValues`.
+Networking, the registration catalog, dependency injection, and NuGet distribution are not
+implemented yet.
 
 ```csharp
 using TinyFlags;
@@ -28,8 +29,26 @@ The analysis produces these definitions:
 | `MyApp.Checkout.TextoBoton` | String | `"Comprar"` |
 
 `IFeatureProvider` is a marker, with no methods or implementation. Declaration getters describe
-defaults; calling them directly still returns those defaults. The agreed future generated
-class is `CheckoutFeatureFlags`, whose getters will delegate to the client's `FeatureValues`.
+defaults; calling them directly still returns those defaults. The generated public sealed
+class is `MyApp.CheckoutFeatureFlags`. Its constructor takes `FeatureValues`, and each getter
+reads the current store with the declared default as fallback:
+
+```csharp
+var values = new FeatureValues();
+var flags = new MyApp.CheckoutFeatureFlags(values);
+
+bool enabled = flags.NuevoCheckout; // false
+values.ReplaceSnapshot(new Dictionary<string, object>
+{
+    ["MyApp.Checkout.NuevoCheckout"] = true
+});
+enabled = flags.NuevoCheckout; // true, using the same generated instance
+```
+
+Generated classes do not implement the declaration marker or instantiate declaration classes.
+Partial declarations produce one access class. Escaped C# identifiers and string literals are
+supported. A generated class name must not conflict with an existing type, namespace, or one
+of its feature properties; conflicts produce `TFG004` instead of a generated class.
 
 ## Local values
 
@@ -85,6 +104,7 @@ the pipeline; their arrival order is not a catalog ordering contract.
 | `TFG001` | Error | Unsupported provider shape |
 | `TFG002` | Error | Unsupported property shape or type |
 | `TFG003` | Error | Missing, null, or nonconstant default |
+| `TFG004` | Error | Generated class name conflicts |
 
 ## Components
 
@@ -95,22 +115,36 @@ tests/TinyFlags.Tests
 tests/TinyFlags.SourceGen.Tests
 ```
 
-The implemented flow is discovery -> analysis -> validation -> definition model.
+The implemented flow is discovery -> analysis -> validation -> generation.
 `Discovery` performs the initial syntax filter. `Analysis` resolves the marker, combines partial
 members, and extracts flag information. The generator entry point connects these phases through
 Roslyn's syntax predicate and semantic transform.
 Roslyn symbols stay inside `Analysis`. Models and validation have no Roslyn dependencies;
 source positions and issues are plain data. The generator entry point and diagnostic reporter
-adapt these results to Roslyn. Planning and emission come in later slices.
+adapt these results to Roslyn. `Generation` receives validated definitions and returns source
+text, with no Roslyn dependency:
+
+```text
+Generation/
+  FeatureGeneration.cs
+  Planning/
+    FeatureAccessPlanner.cs
+    FeatureAccessPlan.cs
+  Emission/
+    FeatureAccessEmitter.cs
+```
 
 The incremental pipeline analyzes and validates providers individually. Models compare by
 value, including their collections, so equivalent results reuse downstream work. Partial
 declarations contribute one provider. Roslyn may repeat semantic analysis after an edit;
-validation is reused when the extracted model is unchanged. Diagnostic reporting binds
+validation is reused when the extracted model is unchanged. Unchanged validated definitions
+reuse generation, even if their source positions moved. Diagnostic reporting binds
 locations to the current compilation.
 
 Tests use real Roslyn compilations and the actual marker assembly. They verify extracted
 definitions, constant values, marker identity, diagnostic IDs, and diagnostic locations.
+Generated access tests compile and load consumer assemblies, then execute typed getters against
+real `FeatureValues` snapshots. They check default fallback, updates, escaping, and naming conflicts.
 Incremental tests reuse the same driver across edits and inspect tracked step results to verify
 cache reuse and invalidation, including external constants and partial declarations.
 The test project invokes the generator directly; automatic inclusion in a consumer NuGet
