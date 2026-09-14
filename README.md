@@ -8,8 +8,9 @@ The generator discovers feature providers, reads their flag definitions, and rep
 declarations at compile time. It generates typed access classes backed by `FeatureValues`.
 Each assembly also gets a local registration catalog and contributes it automatically when
 its module initializes. The root application can compose these definitions through
-`TinyFlagsBootstrap`. Networking, dependency injection, and NuGet distribution are not
-implemented yet.
+`TinyFlagsBootstrap`. `AddTinyFlags()` registers generated access classes from initialized
+assemblies using a shared local store. The runtime and generator pack into one NuGet package,
+verified with a separate local consumer. Networking is not implemented; no package is published yet.
 
 ```csharp
 using TinyFlags;
@@ -87,14 +88,45 @@ once; conflicting kinds or defaults throw `InvalidOperationException` during com
 Keys are case-sensitive. Later contributions appear in subsequent snapshots without changing
 earlier results.
 
-Generated code calls `AddContribution(Type, IReadOnlyList<FeatureDefinition>)`; applications
-normally only consume `GetDefinitions()`. Registration copies the supplied collection, and the
+Generated code calls `AddContribution` with definitions and a service registration callback;
+applications use `AddTinyFlags()` and `GetDefinitions()`. Registration copies the supplied collection, and the
 first registration per catalog type wins. Identically named catalog types from different
 assemblies remain separate contributors. Registration and composition are thread-safe.
 
 The bootstrap does not scan, load, or initialize assemblies. Referencing a library without
 using it does not guarantee its contribution has registered. Compose after the relevant
 modules have initialized; automatic inclusion of unused references is not implemented.
+
+## Dependency injection
+
+`AddTinyFlags()` registers a singleton `FeatureValues` per container and applies registered
+assembly callbacks. The generator emits typed singleton factories for each valid access class,
+including empty providers. Existing store and access-class registrations are preserved:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using TinyFlags;
+
+var services = new ServiceCollection();
+services.AddTinyFlags();
+using var provider = services.BuildServiceProvider();
+var flags = provider.GetRequiredService<MyApp.CheckoutFeatureFlags>();
+```
+
+The runtime supports `AddContribution(Type, IReadOnlyList<FeatureDefinition>,
+Action<IServiceCollection>)` for assembly registration code. The first registration per type
+keeps both its definitions and its callback, including metadata-only registrations. Generated
+factories resolve FeatureValues from the container. Scopes share the same store and access
+instances; separate containers have independent instances unless explicitly supplied by callers.
+
+Each AddTinyFlags call applies a snapshot of registered callbacks outside the bootstrap lock.
+Callbacks must support repeated application, for example through TryAddSingleton. A failed
+callback propagates its exception; already-added services remain. Later contributions can be
+applied by calling AddTinyFlags again before building the container. Registration does not
+modify an already-built service provider. Configure each service collection sequentially.
+
+Generated registration performs no network I/O. Future server registration and synchronization
+will run in a background worker without making application startup wait for the server.
 
 ## Local values
 
@@ -201,11 +233,37 @@ duplicate registration, equivalent definitions, and conflicting defaults/types. 
 uses an isolated runtime instance so static contributions cannot leak between tests.
 Incremental tests reuse the same driver across edits and inspect tracked step results to verify
 cache reuse and invalidation, including external constants and partial declarations.
-The test project invokes the generator directly; automatic inclusion in a consumer NuGet
-package is a later slice.
+The generator tests invoke Roslyn directly. A separate package verification script tests
+automatic generator inclusion through ordinary PackageReference consumers.
 
 ```shell
 dotnet test TinyFlags.slnx
 ```
+
+## Local package verification
+
+Pack the runtime and generator together:
+
+```shell
+dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
+```
+
+The package contains the net8.0 runtime, the netstandard2.0 generator under
+`analyzers/dotnet/cs`, and this README. Consumers reference TinyFlags in each project declaring
+flags; no separate analyzer reference is needed. DI abstractions are the runtime package's
+only NuGet dependency. The generator's Roslyn dependencies are supplied by the compiler host.
+
+Run the package smoke test from PowerShell:
+
+```powershell
+./tests/TinyFlags.PackageTests/Verify-Package.ps1
+```
+
+It packs a unique local version, restores a separate host/library pair into a fresh package
+cache, builds and runs it, then verifies that an invalid declaration produces TFG002. The
+consumer checks defaults, automatic DI across initialized assemblies, shared updates, and root
+catalog composition. The generator DLL must not be copied to the application's runtime output.
+Artifacts and the expected failing build log remain under `artifacts/package-tests`.
+The script needs NuGet access for Microsoft DI dependencies and does not publish packages.
 
 See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).

@@ -32,6 +32,8 @@ internal sealed class FeatureCatalogEmitter
         source.AppendLine("            });");
         source.AppendLine();
         WriteModuleInitializer(source);
+        source.AppendLine();
+        WriteRegistrations(source, plan, cancellationToken);
         source.AppendLine("    }");
         source.AppendLine("}");
         return source.ToString();
@@ -42,7 +44,22 @@ internal sealed class FeatureCatalogEmitter
         source.AppendLine("        [global::System.Runtime.CompilerServices.ModuleInitializer]");
         source.AppendLine("        internal static void Initialize()");
         source.AppendLine("        {");
-        source.AppendLine("            global::TinyFlags.TinyFlagsBootstrap.AddContribution(typeof(ThisAssemblyFeatureCatalog), Definitions);");
+        source.AppendLine("            global::TinyFlags.TinyFlagsBootstrap.AddContribution(typeof(ThisAssemblyFeatureCatalog), Definitions, Register);");
+        source.AppendLine("        }");
+    }
+
+    private static void WriteRegistrations(StringBuilder source, FeatureCatalogPlan plan, CancellationToken cancellationToken)
+    {
+        source.AppendLine("        private static void Register(global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)");
+        source.AppendLine("        {");
+        foreach (var className in plan.AccessClassNames)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            source.Append("            global::Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton<global::")
+                .Append(className).AppendLine(">(services,");
+            source.Append("                static provider => new global::").Append(className).AppendLine("(");
+            source.AppendLine("                    global::Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<global::TinyFlags.FeatureValues>(provider)));");
+        }
         source.AppendLine("        }");
     }
 

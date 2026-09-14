@@ -121,7 +121,7 @@ blank/missing key rejection, and null string default rejection.
 
 Status: implemented, verified, and explicitly approved by the user before step 4.2.
 
-## Current slice: 4.2 - generated catalogs and root composition
+## Completed slice: 4.2 - generated catalogs and root composition
 
 Implemented local catalog: each assembly gets an internal
 `TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions`, with an immutable collection
@@ -157,6 +157,92 @@ there is no production reset hook or mocked registry.
 
 Status: implemented, verified, and approved by the user's instruction to commit and move on.
 No DI or HTTP yet.
+
+## Completed slice: 5 - dependency injection
+
+The user approved slice 4.2 and requested its commit and continued work. Existing code already
+provides generated access constructors taking FeatureValues and per-assembly definition
+contributions. The remaining DI behavior is one shared store per container and typed access
+registration from initialized assemblies through `services.AddTinyFlags()`.
+
+The user approved continuing with the proposed callback contract and runtime step. Agreed steps:
+
+1. Runtime DI plumbing: add the DI abstractions dependency, `AddTinyFlags`, and an overload
+   of `AddContribution` accepting `Action<IServiceCollection>` alongside the catalog type and
+   definitions. Preserve the existing metadata-only overload. Register FeatureValues once
+   per container and apply a snapshot of registration callbacks outside the registry lock.
+   Test with real service collections/providers: repeat registration, independent containers,
+   preservation of an explicitly supplied store, and existing instances observing updates.
+2. Generated registrations: include access-class identities in the generation plan and emit
+   typed singleton factories using the container's FeatureValues. Pass the generated callback
+   from each module initializer. Verify resolution and shared updates across separately
+   compiled libraries and a host, including repeated AddTinyFlags calls.
+
+The approved callback is a registration contract. Its current
+consumer is the root DI registration method; generated code knows the concrete access types
+that the runtime cannot reference. A standard delegate avoids a custom contribution interface.
+The simpler alternative is manual registration of every generated access class in the host,
+which loses the intended automatic multi-assembly composition.
+
+Use singleton access classes because getters read the shared store on every call. Use TryAdd
+registrations so repeated calls do not duplicate services or replace explicit registrations.
+Assemblies must initialize before registration; this slice adds no assembly scanning, dynamic
+service-provider mutation, networking, or packaging. Each step stops for review.
+
+Step 5.1 is implemented: TinyFlags references DI abstractions, AddTinyFlags registers the shared
+store with TryAddSingleton, and bootstrap contributions keep definitions and callbacks together.
+The first registration for a contribution type wins across both overloads. Apply takes a
+snapshot under the registry lock and executes callbacks outside it. Repeated AddTinyFlags calls
+reapply callbacks; callbacks must use repeat-safe registrations. This also allows contributions
+registered later to be applied before building a container. Callback failures propagate and do
+not roll back service registrations already made; repeat-safe callbacks can be retried.
+
+Verification: `dotnet test TinyFlags.slnx -warnaserror` passed 133 tests (112 generator/integration,
+21 runtime). Nine new scenarios use real service providers and generated access classes in an
+isolated runtime. They verify sharing across scopes, updates to existing instances, independence
+between containers, an explicit store, duplicate contribution identity, metadata-only precedence,
+late contributions, null arguments, and retry after a callback failure. No mocks or reset hooks.
+
+Status: step 5.1 implemented, verified, and approved by the user's instruction to continue.
+
+Step 5.2 is implemented: the catalog plan includes sorted access-class names, including empty
+providers. Its equality includes those names, so renaming an empty provider invalidates its
+registration. The emitter generates typed TryAddSingleton factories using FeatureValues and
+passes the registration method through the module initializer. No Roslyn dependencies enter
+planning or emission. Existing runtime callback tests now register a concrete test consumer of
+the generated access class, keeping manual callback behavior distinct from automatic registration.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed 138 tests
+(117 generator/integration, 21 runtime). New checks cover root plus transitive library resolution,
+shared updates and singleton scopes across assemblies, repeated registration, reversed library
+load order, partial/empty/escaped declarations, explicit access instances, invalid providers,
+and incremental invalidation after renaming an empty provider.
+
+Status: step 5.2 implemented, verified, and approved by the user's instruction to continue.
+
+## Completed slice: 6 - local NuGet consumer
+
+Approved scope: package the runtime and source generator together and verify a separate local
+consumer. TinyFlags.csproj builds the generator through a private project reference and packs
+its DLL under analyzers/dotnet/cs, the runtime under lib/net8.0, and README.md at the package
+root. The generator remains a compiler asset, not a runtime dependency. No public publishing.
+
+Implemented tests/TinyFlags.PackageTests/Verify-Package.ps1 with a host and library fixture.
+The script packs a unique prerelease version, checks package assets and dependencies, copies
+the fixtures into an isolated artifacts directory, and restores through a local feed using a
+fresh package cache. Each fixture consumes TinyFlags through PackageReference; the only project
+reference is the host-to-library relationship. NuGet source mapping requires TinyFlags to
+come from the local feed. The fixtures stay outside the main solution because their build
+requires the freshly packed package; run the verification script explicitly.
+
+Verification: the package consumer builds in Release with zero warnings/errors, resolves flags
+from the host and initialized library, checks defaults, singleton identity, repeat registration,
+live snapshot updates, root definitions, and absence of the generator DLL at runtime. An
+intentional invalid declaration fails a subsequent build with TFG002 from the packaged generator.
+All 138 existing tests also pass with `dotnet test TinyFlags.slnx -warnaserror`.
+
+Status: implemented, verified, and approved by the user's instruction to commit and move on.
+No server or synchronization added.
 
 ## Completed slice: 0 - workspace bootstrap
 
@@ -244,3 +330,10 @@ in their constructors.
 The future synchronization worker replaces the snapshot after successful API reads and keeps
 the last known values after failures. `FeatureValues` and the marker were discussed and approved;
 any additional abstraction still requires explanation and permission under the working agreement.
+
+Startup requirement explicitly requested by the user: registration and initial synchronization
+with the server must not delay process startup. Startup signals the background worker and
+continues without waiting for network I/O. The worker owns server registration, synchronization,
+and retries. Reads use declared defaults until a successful initial snapshot arrives; subsequent
+failures retain the last known values. Design the signaling mechanism in that future feature;
+do not introduce it into the current DI slice.

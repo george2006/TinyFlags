@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TinyFlags;
 
@@ -10,20 +11,33 @@ namespace TinyFlags;
 public static class TinyFlagsBootstrap
 {
     private static readonly object SyncRoot = new();
-    private static readonly Dictionary<Type, FeatureDefinition[]> Contributions = new();
+    private static readonly Dictionary<Type, (FeatureDefinition[] Definitions, Action<IServiceCollection> Register)> Contributions = new();
 
     /// <summary>
     /// Registers a snapshot of an assembly's definitions. The first registration for a type wins.
     /// </summary>
     public static void AddContribution(Type contributionType, IReadOnlyList<FeatureDefinition> definitions)
     {
+        AddContribution(contributionType, definitions, static _ => { });
+    }
+
+    /// <summary>
+    /// Registers definitions and a service registration callback as one contribution.
+    /// Callbacks must support repeated application to the same service collection.
+    /// </summary>
+    public static void AddContribution(
+        Type contributionType,
+        IReadOnlyList<FeatureDefinition> definitions,
+        Action<IServiceCollection> register)
+    {
         ArgumentNullException.ThrowIfNull(contributionType);
         ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(register);
         var snapshot = CopyDefinitions(definitions);
 
         lock (SyncRoot)
         {
-            Contributions.TryAdd(contributionType, snapshot);
+            Contributions.TryAdd(contributionType, (snapshot, register));
         }
     }
 
@@ -36,10 +50,24 @@ public static class TinyFlagsBootstrap
         FeatureDefinition[][] contributions;
         lock (SyncRoot)
         {
-            contributions = Contributions.Values.ToArray();
+            contributions = Contributions.Values.Select(contribution => contribution.Definitions).ToArray();
         }
 
         return ComposeDefinitions(contributions);
+    }
+
+    internal static void Apply(IServiceCollection services)
+    {
+        Action<IServiceCollection>[] registrations;
+        lock (SyncRoot)
+        {
+            registrations = Contributions.Values.Select(contribution => contribution.Register).ToArray();
+        }
+
+        foreach (var register in registrations)
+        {
+            register(services);
+        }
     }
 
     private static FeatureDefinition[] CopyDefinitions(IReadOnlyList<FeatureDefinition> definitions)

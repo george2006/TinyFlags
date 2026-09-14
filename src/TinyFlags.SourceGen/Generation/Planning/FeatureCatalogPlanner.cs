@@ -19,6 +19,10 @@ internal sealed class FeatureCatalogPlanner
             features.AddRange(provider.Features);
         }
 
-        return new FeatureCatalogPlan(features.OrderBy(feature => feature.Key, StringComparer.Ordinal).ToImmutableArray());
+        var classNames = providers.Select(provider => provider.QualifiedName + "FeatureFlags")
+            .OrderBy(name => name, StringComparer.Ordinal).ToImmutableArray();
+
+        return new FeatureCatalogPlan(
+            features.OrderBy(feature => feature.Key, StringComparer.Ordinal).ToImmutableArray(), classNames);
     }
 }

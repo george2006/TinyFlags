@@ -5,6 +5,64 @@ namespace TinyFlags.SourceGen.Tests;
 public sealed class MultiAssemblyCatalogTests
 {
     [Fact]
+    public void One_root_registration_resolves_host_and_transitive_library_flags_with_shared_updates()
+    {
+        var billing = CompileLibrary("Billing", """
+            namespace Billing;
+            public class Flags : TinyFlags.IFeatureProvider { public bool Enabled => false; }
+            public static class Api { public static void Initialize() { } }
+            """);
+        var search = CompileLibrary("Search", """
+            namespace Search;
+            public class Flags : TinyFlags.IFeatureProvider { public string Text => "Find"; }
+            public static class Api { public static void Initialize() => Billing.Api.Initialize(); }
+            """, billing);
+        const string host = """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            using Microsoft.Extensions.DependencyInjection;
+            using TinyFlags;
+            public class Root : IFeatureProvider { public bool Enabled => false; }
+            public static class Scenario
+            {
+                public static bool Run()
+                {
+                    Search.Api.Initialize();
+                    var services = new ServiceCollection().AddTinyFlags();
+                    services.AddTinyFlags();
+                    using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+                    {
+                        ValidateOnBuild = true, ValidateScopes = true
+                    });
+                    using var scope = provider.CreateScope();
+                    var billing = provider.GetRequiredService<Billing.FlagsFeatureFlags>();
+                    var search = provider.GetRequiredService<Search.FlagsFeatureFlags>();
+                    var root = provider.GetRequiredService<RootFeatureFlags>();
+                    var defaults = !billing.Enabled && search.Text == "Find" && !root.Enabled;
+                    provider.GetRequiredService<FeatureValues>().ReplaceSnapshot(new Dictionary<string, object>
+                    {
+                        ["Billing.Flags.Enabled"] = true,
+                        ["Search.Flags.Text"] = "Updated",
+                        ["Root.Enabled"] = true
+                    });
+                    return defaults && billing.Enabled && search.Text == "Updated" && root.Enabled
+                        && ReferenceEquals(billing, scope.ServiceProvider.GetRequiredService<Billing.FlagsFeatureFlags>())
+                        && ReferenceEquals(search, scope.ServiceProvider.GetRequiredService<Search.FlagsFeatureFlags>())
+                        && ReferenceEquals(root, scope.ServiceProvider.GetRequiredService<RootFeatureFlags>())
+                        && provider.GetServices<FeatureValues>().Count() == 1
+                        && provider.GetServices<Billing.FlagsFeatureFlags>().Count() == 1
+                        && provider.GetServices<Search.FlagsFeatureFlags>().Count() == 1
+                        && provider.GetServices<RootFeatureFlags>().Count() == 1;
+                }
+            }
+            """;
+
+        Assert.True(ExecuteHost<bool>(host, billing, search));
+        Assert.True(ExecuteHost<bool>(host, search, billing));
+    }
+
+    [Fact]
     public void Root_composes_its_own_flags_and_initialized_library_contributions()
     {
         var billing = CompileLibrary("Billing", """

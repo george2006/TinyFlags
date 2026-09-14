@@ -1,0 +1,4 @@
+public sealed class InvalidFlags : TinyFlags.IFeatureProvider
+{
+    public int Unsupported => 42;
+}
