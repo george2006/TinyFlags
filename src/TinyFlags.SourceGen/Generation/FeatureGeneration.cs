@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Threading;
 using TinyFlags.SourceGen.Generation.Emission;
 using TinyFlags.SourceGen.Generation.Planning;
@@ -16,5 +17,20 @@ internal sealed class FeatureGeneration
         var source = new FeatureAccessEmitter().Emit(plan, cancellationToken);
 
         return (plan.HintName, source);
+    }
+
+    public FeatureCatalogPlan PlanCatalog(
+        ImmutableArray<FeatureProviderDefinition> providers,
+        CancellationToken cancellationToken)
+    {
+        return new FeatureCatalogPlanner().Create(providers, cancellationToken);
+    }
+
+    public (string HintName, string Source) GenerateCatalog(
+        FeatureCatalogPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var source = new FeatureCatalogEmitter().Emit(plan, cancellationToken);
+        return ("TinyFlags.Generated.ThisAssemblyFeatureCatalog.g.cs", source);
     }
 }

@@ -4,6 +4,14 @@ namespace TinyFlags.SourceGen.Diagnostics;
 
 internal static class FeatureDiagnostics
 {
+    public static readonly DiagnosticDescriptor CatalogNameConflict = new(
+        "TFG005",
+        "Generated feature catalog name conflicts",
+        "Declaration '{0}' conflicts with the generated catalog 'TinyFlags.Generated.ThisAssemblyFeatureCatalog'",
+        "TinyFlags",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor GeneratedNameConflict = new(
         "TFG004",
         "Generated feature class name conflicts",

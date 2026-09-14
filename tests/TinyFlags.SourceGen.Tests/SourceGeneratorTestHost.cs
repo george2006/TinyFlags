@@ -10,6 +10,13 @@ internal static class SourceGeneratorTestHost
 {
     private static readonly ImmutableArray<MetadataReference> References = CreateReferences();
 
+    public const string CatalogHintName = "TinyFlags.Generated.ThisAssemblyFeatureCatalog.g.cs";
+
+    public static IEnumerable<GeneratedSourceResult> AccessSources(GeneratorDriverRunResult run)
+    {
+        return Assert.Single(run.Results).GeneratedSources.Where(source => source.HintName != CatalogHintName);
+    }
+
     public static FeatureValidationResult Discover(params string[] sources)
     {
         return ReadDefinitions(Run(sources));
@@ -64,7 +71,11 @@ internal static class SourceGeneratorTestHost
 
     public static T Execute<T>(params string[] sources)
     {
-        var compilation = CreateCompilation(sources);
+        return ExecuteAssembly<T>(CompileAssembly(CreateCompilation(sources)));
+    }
+
+    public static byte[] CompileAssembly(Compilation compilation)
+    {
         var driver = CreateDriver().RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
         Assert.Empty(driver.GetRunResult().Diagnostics);
         AssertCompiles(output);
@@ -72,11 +83,24 @@ internal static class SourceGeneratorTestHost
         using var stream = new MemoryStream();
         var emitted = output.Emit(stream);
         Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
-        stream.Position = 0;
+        return stream.ToArray();
+    }
+
+    public static T ExecuteAssembly<T>(byte[] hostImage, params byte[][] libraries)
+    {
         var loadContext = new AssemblyLoadContext("FlagConsumer", isCollectible: true);
 
         try
         {
+            // Each scenario gets a real, isolated runtime registry, including its module initializers.
+            loadContext.LoadFromAssemblyPath(typeof(IFeatureProvider).Assembly.Location);
+            foreach (var library in libraries)
+            {
+                using var libraryStream = new MemoryStream(library);
+                loadContext.LoadFromStream(libraryStream);
+            }
+
+            using var stream = new MemoryStream(hostImage);
             var assembly = loadContext.LoadFromStream(stream);
             var run = assembly.GetType("Scenario")!.GetMethod("Run")!;
             return Assert.IsType<T>(run.Invoke(null, null));

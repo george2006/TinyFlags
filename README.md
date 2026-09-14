@@ -6,7 +6,9 @@ Typed feature flag declarations for .NET.
 
 The generator discovers feature providers, reads their flag definitions, and reports unsupported
 declarations at compile time. It generates typed access classes backed by `FeatureValues`.
-Networking, the registration catalog, dependency injection, and NuGet distribution are not
+Each assembly also gets a local registration catalog and contributes it automatically when
+its module initializes. The root application can compose these definitions through
+`TinyFlagsBootstrap`. Networking, dependency injection, and NuGet distribution are not
 implemented yet.
 
 ```csharp
@@ -49,6 +51,50 @@ Generated classes do not implement the declaration marker or instantiate declara
 Partial declarations produce one access class. Escaped C# identifiers and string literals are
 supported. A generated class name must not conflict with an existing type, namespace, or one
 of its feature properties; conflicts produce `TFG004` instead of a generated class.
+
+## Registration definitions
+
+`FeatureDefinition` is immutable metadata for the registration catalog:
+
+```csharp
+var enabled = FeatureDefinition.Boolean("MyApp.Checkout.NuevoCheckout", false);
+var label = FeatureDefinition.String("MyApp.Checkout.TextoBoton", "Comprar");
+```
+
+Each definition exposes `Key`, `Kind` (`FeatureKind.Boolean` or `FeatureKind.String`), and
+`DefaultValue`. The default is a boxed boolean or a non-null string, matching its kind. Typed
+factories keep that pairing valid; keys must not be blank. Empty string defaults are supported.
+Definitions describe declared defaults; live values are held in `FeatureValues`.
+The generator exposes an internal catalog in each assembly:
+
+```csharp
+var definitions = TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions;
+```
+
+`Definitions` is an immutable `IReadOnlyList<FeatureDefinition>`, sorted by key. It includes only
+valid providers from that assembly; partial declarations contribute once. It is empty when
+there are no valid flags. Reading it never executes declaration constructors or getters.
+The generated module initializer registers that catalog with `TinyFlagsBootstrap`. The root
+application composes the registered contributions:
+
+```csharp
+var definitions = TinyFlagsBootstrap.GetDefinitions();
+```
+
+The result is an immutable snapshot ordered ordinally by key, including contributions from
+initialized library modules and the host. Equivalent keys with the same kind and default appear
+once; conflicting kinds or defaults throw `InvalidOperationException` during composition.
+Keys are case-sensitive. Later contributions appear in subsequent snapshots without changing
+earlier results.
+
+Generated code calls `AddContribution(Type, IReadOnlyList<FeatureDefinition>)`; applications
+normally only consume `GetDefinitions()`. Registration copies the supplied collection, and the
+first registration per catalog type wins. Identically named catalog types from different
+assemblies remain separate contributors. Registration and composition are thread-safe.
+
+The bootstrap does not scan, load, or initialize assemblies. Referencing a library without
+using it does not guarantee its contribution has registered. Compose after the relevant
+modules have initialized; automatic inclusion of unused references is not implemented.
 
 ## Local values
 
@@ -105,11 +151,12 @@ the pipeline; their arrival order is not a catalog ordering contract.
 | `TFG002` | Error | Unsupported property shape or type |
 | `TFG003` | Error | Missing, null, or nonconstant default |
 | `TFG004` | Error | Generated class name conflicts |
+| `TFG005` | Error | Generated catalog name conflicts |
 
 ## Components
 
 ```text
-src/TinyFlags                  Marker and local values (net8.0)
+src/TinyFlags                  Marker, local values and catalog composition (net8.0)
 src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
 tests/TinyFlags.Tests
 tests/TinyFlags.SourceGen.Tests
@@ -130,8 +177,11 @@ Generation/
   Planning/
     FeatureAccessPlanner.cs
     FeatureAccessPlan.cs
+    FeatureCatalogPlanner.cs
+    FeatureCatalogPlan.cs
   Emission/
     FeatureAccessEmitter.cs
+    FeatureCatalogEmitter.cs
 ```
 
 The incremental pipeline analyzes and validates providers individually. Models compare by
@@ -145,6 +195,10 @@ Tests use real Roslyn compilations and the actual marker assembly. They verify e
 definitions, constant values, marker identity, diagnostic IDs, and diagnostic locations.
 Generated access tests compile and load consumer assemblies, then execute typed getters against
 real `FeatureValues` snapshots. They check default fallback, updates, escaping, and naming conflicts.
+Multi-assembly tests compile separate libraries and a host, then execute module initializers
+and root composition. They cover local catalog isolation, transitive calls, load order,
+duplicate registration, equivalent definitions, and conflicting defaults/types. Each scenario
+uses an isolated runtime instance so static contributions cannot leak between tests.
 Incremental tests reuse the same driver across edits and inspect tracked step results to verify
 cache reuse and invalidation, including external constants and partial declarations.
 The test project invokes the generator directly; automatic inclusion in a consumer NuGet

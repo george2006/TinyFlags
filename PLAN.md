@@ -96,8 +96,67 @@ now cover generation reuse and removal when declarations become invalid or confl
 Status: implemented, verified, and explicitly approved by the user at the end of the session.
 No catalog, DI registration, networking, or NuGet packaging in this slice.
 
-Next session: agree the catalog contract for slice 4 before implementation. The user has ended
-today's session; no further feature work is authorized for this session.
+The session ended after slice 3. The user resumed work on 2026-09-14 and approved the catalog
+contract and its two reviewable steps below.
+
+## Completed slice: 4.1 - registration definition contract
+
+Approved direction: one generated internal catalog per assembly, exposed as
+`TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions`. Entries carry a key, supported
+kind and declared default; current values remain in `FeatureValues`.
+
+Agreed steps:
+
+1. Implement the runtime definition contract and review it.
+2. Generate the immutable catalog and verify it by compiling and executing consumers.
+
+Step 4.1 adds the concrete immutable `FeatureDefinition`, its `Boolean` and `String` factories,
+and the `FeatureKind` discriminator. A private constructor prevents callers from creating a
+kind/default mismatch. Keys must be nonblank; string defaults must be non-null (empty is valid).
+Keys and defaults retain their supplied values. No wire format or serialization contract yet.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 96 tests
+(75 generator, 21 runtime). Eleven new cases verify typed defaults, exact string preservation,
+blank/missing key rejection, and null string default rejection.
+
+Status: implemented, verified, and explicitly approved by the user before step 4.2.
+
+## Current slice: 4.2 - generated catalogs and root composition
+
+Implemented local catalog: each assembly gets an internal
+`TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions`, with an immutable collection
+of valid definitions ordered by key. An assembly with no valid flags has an empty catalog.
+Planning collects only validated providers; analysis and access generation remain per provider.
+The catalog plan uses value equality to preserve downstream cache reuse. Reserved catalog name
+conflicts report `TFG005` and suppress catalog generation.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed 124 tests
+(103 generator, 21 runtime). Catalog tests compile and execute consumers to verify metadata,
+immutability, ordering, defaults, partial declarations and escaping; they also check diagnostics,
+omission of invalid providers, cache reuse, and updates after provider removal.
+
+The user clarified that catalogs must contribute across assemblies and be composed at the
+root, following the suite. Reviewed TinyEventsBootstrap and TinyValidationBootstrap: generated
+module initializers register contributions, and the host consumes the composed registry.
+
+Approved and implemented contract: concrete `TinyFlagsBootstrap` with
+`AddContribution(Type, IReadOnlyList<FeatureDefinition>)` for generated code and
+`GetDefinitions()` for the root. No extra interface. Generated module initializers register
+each catalog by its actual type identity. Registration copies the supplied definitions; the
+first registration per type wins. Composition returns an immutable snapshot sorted ordinally
+by key, deduplicates equivalent definitions, and throws for conflicting kinds or defaults.
+Conflicts fail during composition, not module initialization. The bootstrap does not load or
+initialize unused referenced assemblies.
+
+Tests compile separate libraries and a host and execute their generated contributions. They
+cover root/local catalogs, reversed load order, transitive calls, repeated registration,
+equivalent keys, and conflicting kinds/defaults. Additional behavior checks cover caller
+mutation isolation, immutable earlier snapshots, invalid input, case-sensitive keys, and
+concurrent registration/composition. Each executable scenario loads its own runtime instance;
+there is no production reset hook or mocked registry.
+
+Status: implemented, verified, and approved by the user's instruction to commit and move on.
+No DI or HTTP yet.
 
 ## Completed slice: 0 - workspace bootstrap
 

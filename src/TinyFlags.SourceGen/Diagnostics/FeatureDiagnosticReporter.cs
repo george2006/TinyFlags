@@ -25,6 +25,7 @@ internal static class FeatureDiagnosticReporter
             "TFG002" => FeatureDiagnostics.UnsupportedProperty,
             "TFG003" => FeatureDiagnostics.NonConstantDefault,
             "TFG004" => FeatureDiagnostics.GeneratedNameConflict,
+            "TFG005" => FeatureDiagnostics.CatalogNameConflict,
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Unknown feature diagnostic.")
         };
     }

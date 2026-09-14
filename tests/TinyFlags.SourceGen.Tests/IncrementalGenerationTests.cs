@@ -107,7 +107,7 @@ public sealed class IncrementalGenerationTests
         Assert.Equal("Search", Assert.Single(SourceGeneratorTestHost.ReadDefinitions(run).Providers).Name);
         Assert.Contains(IncrementalStepRunReason.Removed, Reasons(run, "FeatureValidation"));
         Assert.Equal("SearchFeatureFlags.g.cs",
-            Assert.Single(Assert.Single(run.Results).GeneratedSources).HintName);
+            Assert.Single(SourceGeneratorTestHost.AccessSources(run)).HintName);
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public sealed class IncrementalGenerationTests
         var run = RunEdit(new[] { Checkout }, 0, Checkout + "\npublic class CheckoutFeatureFlags { }");
 
         Assert.Equal("TFG004", Assert.Single(run.Diagnostics).Id);
-        Assert.Empty(Assert.Single(run.Results).GeneratedSources);
+        Assert.Empty(SourceGeneratorTestHost.AccessSources(run));
         Assert.Contains(IncrementalStepRunReason.Removed, Reasons(run, "FeatureGeneration"));
     }
 

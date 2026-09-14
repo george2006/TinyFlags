@@ -113,7 +113,7 @@ public sealed class GeneratedAccessTests
             """;
 
         Assert.Equal(new object[] { true, "Buy" }, SourceGeneratorTestHost.Execute<object[]>(first, second, consumer));
-        Assert.Single(Assert.Single(SourceGeneratorTestHost.Run(first, second).Results).GeneratedSources);
+        Assert.Single(SourceGeneratorTestHost.AccessSources(SourceGeneratorTestHost.Run(first, second)));
     }
 
     [Fact]
@@ -224,7 +224,7 @@ public sealed class GeneratedAccessTests
             "public class Checkout : TinyFlags.IFeatureProvider { public bool Enabled => true; }", existing);
 
         Assert.Equal("TFG004", Assert.Single(run.Diagnostics).Id);
-        Assert.Empty(Assert.Single(run.Results).GeneratedSources);
+        Assert.Empty(SourceGeneratorTestHost.AccessSources(run));
     }
 
     [Theory]
@@ -237,7 +237,7 @@ public sealed class GeneratedAccessTests
             + " public class CheckoutFeatureFlags { } }");
 
         Assert.Equal("TFG004", Assert.Single(run.Diagnostics).Id);
-        Assert.Empty(Assert.Single(run.Results).GeneratedSources);
+        Assert.Empty(SourceGeneratorTestHost.AccessSources(run));
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public sealed class GeneratedAccessTests
             "public class Checkout : TinyFlags.IFeatureProvider { public bool CheckoutFeatureFlags => true; }");
 
         Assert.Equal("TFG004", Assert.Single(run.Diagnostics).Id);
-        Assert.Empty(Assert.Single(run.Results).GeneratedSources);
+        Assert.Empty(SourceGeneratorTestHost.AccessSources(run));
     }
 
     [Fact]
@@ -258,6 +258,6 @@ public sealed class GeneratedAccessTests
             "public class Good : TinyFlags.IFeatureProvider { public bool Flag => true; }");
 
         Assert.Equal("TFG002", Assert.Single(run.Diagnostics).Id);
-        Assert.Equal("GoodFeatureFlags.g.cs", Assert.Single(Assert.Single(run.Results).GeneratedSources).HintName);
+        Assert.Equal("GoodFeatureFlags.g.cs", Assert.Single(SourceGeneratorTestHost.AccessSources(run)).HintName);
     }
 }
