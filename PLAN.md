@@ -1,6 +1,6 @@
 # TinyFlags
 
-## Current feature: value synchronization - slice 5 awaiting review
+## Current feature: value synchronization - slice 5 approved
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
 The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
@@ -143,7 +143,7 @@ timeouts and interrupted-body recovery, unchanged/stale/environment checks, and 
 registration/read-only access. Approved by the user's instruction to commit and move on. Commit
 this slice and then implement slice 5: initial publication through the independent synchronization worker.
 
-### Synchronization slice 5: initial publication - implemented and verified, awaiting review
+### Synchronization slice 5: initial publication - implemented, verified and approved
 
 Committed the approved client/refactor slice as 1aaf214. Added the agreed concrete
 TinyFlagsSynchronizationWorker with injected client, singleton FeatureValues, host lifetime and logger.
@@ -165,7 +165,7 @@ when reading is also denied. The packaged consumer now asserts declared defaults
 after startup an initial snapshot may legitimately replace them, so that old assertion would race.
 Full verification passed all 460 tests (117 generator/integration, 176 SDK runtime, 167 server),
 with warnings treated as errors and no skips, including the packaged consumer. git diff --check
-passed. Slice 5 remains uncommitted and awaits review.
+passed. Approved by the instruction to commit; committed as d325bcf.
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 
