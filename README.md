@@ -376,20 +376,23 @@ key, prints the newly issued secret once, and exits. It requires the Development
 already-applied migrations. Repeating it creates a separate local project/key. Use the printed
 secret as the Bearer credential when calling the endpoint; ordinary startup does not seed data.
 
-## SDK registration transport
+## SDK API client
 
-The internal `TinyFlagsApiClient` accepts an HttpClient and snapshots validated
+The internal `TinyFlagsApiClient` coordinates HTTP access and exposes application results. It snapshots validated
 `TinyFlagsClientOptions`: Endpoint, ApiKey and RequestTimeout (30 seconds by default).
 Endpoint is the server base URI, including any path prefix; a trailing slash is optional.
 HTTPS is required except for HTTP loopback development. URI credentials, query and fragment,
 blank/invalid credentials and invalid timeouts are rejected before sending anything.
 
-Each attempt copies the supplied definition list and sends typed Boolean/String defaults as JSON
-to `v1/client/definitions`, with a per-request Bearer header. Shared HttpClient headers and timeout
-are not changed. The caller owns HttpClient and the returned HttpResponseMessage. The request
-timeout includes buffering the response body; a shorter HttpClient timeout still takes precedence.
-HTTP status, headers (including Retry-After) and body remain available to the caller. Transport
-exceptions and cancellation propagate; the client does not retry or call EnsureSuccessStatusCode.
+`RegisterDefinitionsAsync` copies the catalog once and sends typed Boolean/String defaults to
+`v1/client/definitions`. It completes after successful registration or throws TinyFlagsClientException
+with a classified failure: rejected credentials, denied access, conflicting definitions, rejected
+request or invalid response. Caller cancellation propagates. HTTP messages and response bodies stay
+behind the client boundary; remote error text is not included in the classified exception.
+
+DI creates a concrete FeatureSnapshotReader with the configured size limit and injects it into the
+API client. The registration worker receives the client. The DI-owned client owns its HttpClient;
+an explicitly supplied HttpClient remains caller-owned. Shared headers and timeout are not mutated.
 
 The parameterless AddTinyFlags() remains local-only. To register definitions from a .NET host:
 
@@ -405,19 +408,46 @@ Configuration is validated and copied during setup. Repeating equivalent configu
 one worker; conflicting configuration is rejected. After ApplicationStarted, the worker composes
 the initialized assemblies' catalog and sends one request at a time. DI setup and flag getters never contact
 the server. Shutdown cancels the startup wait or request; redirects are not followed. Failures are
-logged without stopping the host or changing local values. Value downloads are not implemented
-yet. Native .NET 8 host tests verify startup and shutdown; integration tests exercise the worker
+logged without stopping the host or changing local values. Background value synchronization is not
+enabled yet. Native .NET 8 host tests verify startup and shutdown; integration tests exercise the worker
 against the actual registration server, authentication, dispatcher and PostgreSQL over Kestrel.
 
-The worker retries network failures, request timeouts, HTTP 408/429 and 5xx responses. Other
+The client uses TinyFlagsRetryPolicy for network failures, request timeouts, HTTP 408/429 and 5xx responses. Other
 responses stop registration; 204 completes it. RetryDelay defaults to 1 second and MaxRetryDelay
 to 30 seconds. The exponential backoff uses jitter between half and the full capped delay, with
 a minimum of 1 millisecond. Both settings are validated and included in configuration snapshots.
 Valid Retry-After values on 429/503 can extend the wait beyond the normal cap; malformed or expired
 values retain ordinary backoff. Long waits remain cancellable. The same catalog is retried, with
 no fixed attempt limit, and responses are disposed before waiting. The concrete TinyFlagsRetryPolicy
-owns the entire retry operation: attempts, classification, delays and cancellation. The worker
-supplies the HTTP call and handles/disposes the final response. There is no Polly dependency.
+owns attempts, classification, delays and cancellation. It disposes every response, including the
+final response after the client's reader translates it. The worker only awaits registration and
+handles a classified failure. There is no Polly dependency.
+
+## SDK snapshot fetch
+
+`TinyFlagsApiClient.GetValuesAsync` accepts the local catalog and an optional accepted FeatureSnapshot.
+It returns FeatureValuesResult: an updated immutable snapshot or IsUnchanged. It sends the conditional
+header internally, validates unchanged responses against the accepted snapshot, ignores equal/older
+revisions, and rejects an unexpected environment change. The caller never interprets status codes
+or ETags. Transient failures use the same retry policy as registration; this operation does not publish values.
+
+`MaxSnapshotBytes` defaults to 8 MiB and must be positive. The fetch checks both declared content
+length and bytes actually read, including chunked responses. One request deadline covers headers,
+the complete successful body and snapshot parsing; a shorter HttpClient timeout also applies to
+the body. Cancellation or validation failure disposes the response. Interrupted body reads become
+transport failures and are retried; malformed or oversized payloads become an InvalidResponse
+failure rather than an empty or partially valid snapshot. Non-200 bodies are not buffered.
+
+The constructor-injected `FeatureSnapshotReader` owns bounded body reading and validates the JSON shape,
+nonnegative revision, matching environment/revision
+ETag, unique nonblank keys, Boolean/String values and agreement with known catalog kinds. Valid
+keys from other assemblies are accepted; absent keys remain absent so publication can retain the
+existing default-fallback behavior. The snapshot owns an immutable dictionary independent of the
+HTTP response. FeatureSnapshot itself contains only data and internal conditional-request metadata.
+The reader does not impose registration's per-batch flag-count limit.
+
+This slice establishes a fetch operation. Publication and recurring refresh
+belong to the upcoming synchronization worker; configured applications still only register definitions.
 
 ## Local package verification
 

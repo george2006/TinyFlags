@@ -14,6 +14,8 @@ public sealed class TinyFlagsClientOptions
 
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    public int MaxSnapshotBytes { get; set; } = 8 * 1024 * 1024;
+
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
@@ -26,6 +28,7 @@ public sealed class TinyFlagsClientOptions
             Endpoint = new Uri(Endpoint!.AbsoluteUri.TrimEnd('/') + "/"),
             ApiKey = ApiKey,
             RequestTimeout = RequestTimeout,
+            MaxSnapshotBytes = MaxSnapshotBytes,
             RetryDelay = RetryDelay,
             MaxRetryDelay = MaxRetryDelay
         };
@@ -33,6 +36,7 @@ public sealed class TinyFlagsClientOptions
 
     internal bool HasSameConfigurationAs(TinyFlagsClientOptions other)
         => Endpoint == other.Endpoint && ApiKey == other.ApiKey && RequestTimeout == other.RequestTimeout
+            && MaxSnapshotBytes == other.MaxSnapshotBytes
             && RetryDelay == other.RetryDelay && MaxRetryDelay == other.MaxRetryDelay;
 
     internal void Validate()
@@ -52,6 +56,11 @@ public sealed class TinyFlagsClientOptions
         if (RequestTimeout <= TimeSpan.Zero || RequestTimeout > TimeSpan.FromMilliseconds(int.MaxValue))
         {
             throw new ArgumentOutOfRangeException(nameof(RequestTimeout), "RequestTimeout must be positive and no greater than Int32.MaxValue milliseconds.");
+        }
+
+        if (MaxSnapshotBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxSnapshotBytes), "MaxSnapshotBytes must be positive.");
         }
 
         if (RetryDelay < TimeSpan.FromMilliseconds(1) || RetryDelay > TimeSpan.FromMilliseconds(int.MaxValue))

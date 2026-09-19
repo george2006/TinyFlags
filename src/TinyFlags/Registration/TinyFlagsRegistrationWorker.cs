@@ -1,6 +1,4 @@
 using System;
-using System.Net;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
@@ -11,14 +9,14 @@ namespace TinyFlags;
 internal sealed class TinyFlagsRegistrationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TinyFlagsClientOptions options;
+    private readonly TinyFlagsApiClient client;
     private readonly IHostApplicationLifetime lifetime;
     private readonly ILogger<TinyFlagsRegistrationWorker> logger;
 
-    public TinyFlagsRegistrationWorker(TinyFlagsClientOptions options, IHostApplicationLifetime lifetime,
+    public TinyFlagsRegistrationWorker(TinyFlagsApiClient client, IHostApplicationLifetime lifetime,
         ILogger<TinyFlagsRegistrationWorker> logger)
     {
-        this.options = options.CreateSnapshot();
+        this.client = client;
         this.lifetime = lifetime;
         this.logger = logger;
     }
@@ -37,6 +35,10 @@ internal sealed class TinyFlagsRegistrationWorker : BackgroundService
         {
             // Host shutdown is expected, including before ApplicationStarted is signalled.
         }
+        catch (TinyFlagsClientException error)
+        {
+            logger.LogWarning("TinyFlags registration stopped ({Failure}). Local flag values remain available.", error.Failure);
+        }
         catch (Exception error)
         {
             // Exception messages and response bodies may contain remote data or credentials.
@@ -47,21 +49,7 @@ internal sealed class TinyFlagsRegistrationWorker : BackgroundService
     private async Task RegisterDefinitionsAsync(CancellationToken ct)
     {
         var definitions = TinyFlagsBootstrap.GetDefinitions();
-        using var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
-        {
-            Timeout = Timeout.InfiniteTimeSpan
-        };
-        var client = new TinyFlagsApiClient(http, options);
-        var retry = new TinyFlagsRetryPolicy(options);
-        using var response = await retry.ExecuteAsync(
-            token => client.RegisterDefinitionsAsync(definitions, token), logger, ct).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.NoContent)
-        {
-            logger.LogInformation("TinyFlags definitions registered.");
-            return;
-        }
-
-        logger.LogWarning("TinyFlags registration stopped after HTTP {StatusCode}. Local flag values remain available.",
-            (int)response.StatusCode);
+        await client.RegisterDefinitionsAsync(definitions, ct).ConfigureAwait(false);
+        logger.LogInformation("TinyFlags definitions registered.");
     }
 }

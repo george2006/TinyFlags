@@ -13,7 +13,7 @@ public sealed partial class RegistrationWorkerTests
     [Theory]
     [InlineData(200)]
     [InlineData(409)]
-    public async Task Retry_operation_disposes_transient_responses_and_returns_the_final_response_to_its_caller(int finalStatus)
+    public async Task Retry_operation_disposes_every_response_and_returns_only_the_read_result(int finalStatus)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var requests = 0;
@@ -29,18 +29,20 @@ public sealed partial class RegistrationWorkerTests
         });
         var responses = new List<HttpResponseMessage>();
 
-        using var final = await retry.ExecuteAsync(async ct =>
+        var final = await retry.ExecuteAsync(async ct =>
         {
             var response = await http.PostAsync(server.Urls.Single() + "/v1/client/definitions", null, ct);
             responses.Add(response);
             return response;
-        }, NullLogger.Instance, timeout.Token);
+        }, (response, ct) => response.Content.ReadAsStringAsync(ct), TimeSpan.FromSeconds(10), NullLogger.Instance, timeout.Token);
 
         Assert.Equal(2, requests);
-        Assert.Equal((HttpStatusCode)finalStatus, final.StatusCode);
-        Assert.Same(responses[1], final);
-        Assert.Equal("response body", await final.Content.ReadAsStringAsync(timeout.Token));
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => responses[0].Content.ReadAsStringAsync());
+        Assert.Equal((HttpStatusCode)finalStatus, responses[1].StatusCode);
+        Assert.Equal("response body", final);
+        foreach (var response in responses)
+        {
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => response.Content.ReadAsStringAsync());
+        }
     }
 
     [Theory]

@@ -3,6 +3,36 @@ namespace TinyFlags.Tests;
 public sealed class TinyFlagsClientOptionsTests
 {
     [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Invalid_snapshot_limit_is_rejected_before_startup(int bytes)
+    {
+        var options = new TinyFlagsClientOptions
+        {
+            Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key", MaxSnapshotBytes = bytes
+        };
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => options.CreateSnapshot());
+
+        Assert.Equal(nameof(TinyFlagsClientOptions.MaxSnapshotBytes), error.ParamName);
+    }
+
+    [Fact]
+    public void Snapshot_limit_is_copied_and_participates_in_configuration_equality()
+    {
+        var options = new TinyFlagsClientOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key" };
+        Assert.Equal(8 * 1024 * 1024, options.MaxSnapshotBytes);
+        options.MaxSnapshotBytes = 1024;
+        var snapshot = options.CreateSnapshot();
+        Assert.True(snapshot.HasSameConfigurationAs(options.CreateSnapshot()));
+
+        options.MaxSnapshotBytes = 2048;
+
+        Assert.Equal(1024, snapshot.MaxSnapshotBytes);
+        Assert.False(snapshot.HasSameConfigurationAs(options.CreateSnapshot()));
+    }
+
+    [Theory]
     [InlineData(0, 30000)]
     [InlineData(-1, 30000)]
     [InlineData(2147483648L, 2147483648L)]
@@ -36,7 +66,7 @@ public sealed class TinyFlagsClientOptionsTests
             ApiKey = "test-key"
         };
 
-        var error = Assert.Throws<ArgumentException>(() => new TinyFlagsApiClient(http, options));
+        var error = Assert.Throws<ArgumentException>(() => CreateClient(http, options));
 
         Assert.Equal(nameof(TinyFlagsClientOptions.Endpoint), error.ParamName);
     }
@@ -54,7 +84,7 @@ public sealed class TinyFlagsClientOptionsTests
         using var http = new HttpClient();
         var options = new TinyFlagsClientOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = key };
 
-        var error = Assert.Throws<ArgumentException>(() => new TinyFlagsApiClient(http, options));
+        var error = Assert.Throws<ArgumentException>(() => CreateClient(http, options));
 
         Assert.Equal(nameof(TinyFlagsClientOptions.ApiKey), error.ParamName);
         if (!string.IsNullOrWhiteSpace(key))
@@ -76,8 +106,10 @@ public sealed class TinyFlagsClientOptionsTests
             RequestTimeout = TimeSpan.FromMilliseconds(milliseconds)
         };
 
-        var error = Assert.Throws<ArgumentOutOfRangeException>(() => new TinyFlagsApiClient(http, options));
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => CreateClient(http, options));
 
         Assert.Equal(nameof(TinyFlagsClientOptions.RequestTimeout), error.ParamName);
     }
+    private static TinyFlagsApiClient CreateClient(HttpClient http, TinyFlagsClientOptions options)
+        => new(http, options, new FeatureSnapshotReader(options.MaxSnapshotBytes));
 }

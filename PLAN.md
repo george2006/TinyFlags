@@ -1,6 +1,6 @@
 # TinyFlags
 
-## Current feature: value synchronization - slices 1 through 3 approved
+## Current feature: value synchronization - slice 4 approved
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
 The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
@@ -103,6 +103,45 @@ Production code is unchanged by this test addition. The user's instruction to co
 approves slice 3 and its refinements. Commit slices 1-3 together, then begin the agreed slice 4:
 one SDK fetch and complete snapshot validation. The latest full run passed 347 tests; subsequent
 focused runs passed all 61 values tests, including 29 new unit cases (376 distinct tests verified).
+
+### Synchronization slice 4: SDK values and API boundary - implemented, verified and approved
+
+The user approved slice 3 and requested a commit and the next slice. Committed reviewed server work
+as 8decce6. During slice 4 review, the user requested application results from the API client for
+both operations, a dedicated snapshot reader, and constructor injection of that concrete reader.
+
+TinyFlagsApiClient is the adapter. RegisterDefinitionsAsync completes successfully or reports a
+classified TinyFlagsClientException. GetValuesAsync accepts the catalog and optional accepted
+snapshot, and returns FeatureValuesResult: updated snapshot or unchanged. It translates conditional
+responses, preserves equal/older revisions, and rejects mismatched environments or an unchanged
+response without a matching accepted snapshot. Callers do not handle HTTP responses or ETags.
+
+FeatureSnapshotReader owns bounded body reads and JSON/ETag validation. DI injects its concrete
+instance into the client; it holds only the configured size limit, with catalog/response state local
+to each call. FeatureSnapshot holds immutable typed data and internal conditional-request metadata.
+The reader rejects invalid revisions, duplicate properties/keys, blank keys, unsupported/mismatched
+kinds and inconsistent tags. Valid unknown keys and absent known keys are allowed. MaxSnapshotBytes
+is positive, defaults to 8 MiB, and is checked against declared and actual bytes, including chunked
+UTF-8 responses. There is no registration-batch limit on total snapshot size.
+
+The client coordinates the existing TinyFlagsRetryPolicy. Its generic operation supports registration
+completion and values results; each attempt includes send and read/translation under one deadline.
+A shorter HttpClient timeout applies through body reading too. The policy disposes every response,
+retries transient statuses/network/body failures, honors Retry-After and propagates caller cancellation.
+Malformed snapshots become a classified InvalidResponse failure, not an immediate transport retry.
+No new interfaces, generic result hierarchy, transport adapter layer or Polly dependency was added.
+
+DI owns the API client and its HttpClient. Explicitly supplied HttpClients remain caller-owned.
+The registration worker now receives the client and only coordinates startup, catalog registration
+and application-level logging. It contains no HTTP status checks, response disposal or retry loop.
+Publication and recurring synchronization remain later slices; no live values are updated here.
+
+Full solution verification passed all 447 tests (117 generator/integration, 165 SDK runtime,
+165 server tests), with warnings treated as errors and no skips, including the packaged consumer.
+Coverage includes reader validation, retry/disposal behavior, real HTTP byte limits, cancellation,
+timeouts and interrupted-body recovery, unchanged/stale/environment checks, and real PostgreSQL
+registration/read-only access. Approved by the user's instruction to commit and move on. Commit
+this slice and then implement slice 5: initial publication through the independent synchronization worker.
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 

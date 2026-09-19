@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
@@ -40,6 +41,9 @@ public static class TinyFlagsServiceCollectionExtensions
         if (existing is null)
         {
             services.AddSingleton(snapshot);
+            services.AddSingleton(new FeatureSnapshotReader(snapshot.MaxSnapshotBytes));
+            services.AddSingleton(provider => new TinyFlagsApiClient(snapshot,
+                provider.GetRequiredService<FeatureSnapshotReader>(), provider.GetRequiredService<ILogger<TinyFlagsApiClient>>()));
         }
         services.AddHostedService<TinyFlagsRegistrationWorker>();
         return services;
