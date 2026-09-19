@@ -14,5 +14,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/TinyFlags/TinyFlags.csproj" />
+    <ProjectReference Include="../../src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

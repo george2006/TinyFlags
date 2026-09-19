@@ -22,7 +22,8 @@ try {
     $reader = [System.IO.StreamReader]::new($archive.GetEntry('TinyFlags.nuspec').Open())
     try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
     $dependencies = @($manifest.SelectNodes("//*[local-name()='dependency']") | ForEach-Object { $_.id })
-    if ($dependencies.Count -ne 1 -or $dependencies[0] -ne 'Microsoft.Extensions.DependencyInjection.Abstractions') {
+    $expectedDependencies = @('Microsoft.Extensions.DependencyInjection.Abstractions', 'Microsoft.Extensions.Hosting.Abstractions')
+    if (@(Compare-Object ($dependencies | Sort-Object) ($expectedDependencies | Sort-Object)).Count -ne 0) {
         throw "Unexpected runtime package dependencies: $dependencies"
     }
 } finally {

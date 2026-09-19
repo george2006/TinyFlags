@@ -267,8 +267,8 @@ TinyDispatcher, and PostgreSQL. Follow TinyEvents' Testcontainers approach, appl
 isolate test databases, and fail visibly when Docker is unavailable. The design document includes
 the proposed fixtures, coverage matrix, and multi-instance concurrency tests.
 
-Status: slices 1 through 4 approved and committed; slices 3/4 committed as `3bdd23e`.
-The authenticated endpoint and shared test setup are approved for commit. No SDK HTTP client or worker yet.
+Status: slices 1 through 5 approved and committed; slice 5 committed as `0916c4e`.
+The single-attempt SDK HTTP client is implemented and verified, awaiting review. No worker yet.
 
 The user requested smaller, quick-to-review slices. The detailed design now specifies:
 
@@ -456,6 +456,72 @@ integration tests; no tests were removed or skipped.
 
 Approved by the user's instruction to commit and move on. Next slice adds one HTTP registration
 attempt from the SDK client.
+
+### Slice 6: one SDK HTTP attempt - implemented and approved
+
+Added the agreed public TinyFlagsClientOptions and internal TinyFlagsApiClient. Options currently
+contain Endpoint, ApiKey and a 30-second RequestTimeout; retry settings wait until slice 8.
+Validate URI/credential/timeout locally and snapshot settings at construction. Require HTTPS
+except HTTP loopback development; preserve an optional base path and normalize its trailing slash.
+Reject URI credentials, query/fragment and whitespace/control/non-ASCII key characters.
+
+Each call snapshots existing immutable FeatureDefinition entries, serializes string kind names
+and typed defaults, and sends a single authenticated POST. Authorization belongs to that request;
+HttpClient defaults are not mutated. Caller cancellation and the request timeout are linked.
+ResponseContentRead keeps response buffering inside the deadline. Return the actual response,
+including error status, headers and body, for caller disposal. No retry or EnsureSuccessStatusCode.
+The caller owns HttpClient, whose own timeout still applies if shorter. No new NuGet dependencies,
+custom transport interfaces, DI overload or worker. Friend-assembly access lets tests exercise the
+internal client without widening its public API; the integration project now references the SDK.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 245 tests
+(117 generator/integration, 38 SDK runtime, 90 server integration), with no skips.
+Seventeen new local validation cases and eleven integration cases cover typed/escaped defaults,
+replay, empty batches, configuration snapshots, per-request credentials, permanent error responses,
+cancellation and timeout behind a real PostgreSQL lock, recovery on a subsequent caller attempt,
+and a real container outage returning 503. A loopback Kestrel server verifies path prefixes with
+and without trailing slash, one request per attempt, JSON types, and preserved Retry-After/body
+for 429 and 503. No mocked transport or repositories.
+
+`tests/TinyFlags.PackageTests/Verify-Package.ps1` also passed: package structure/dependencies,
+separate net8.0 consumer execution and expected TFG002 diagnostics. Artifacts remain under
+artifacts/package-tests/db53676f8cbc44cf8548230195f09c70. Packaged HTTP end-to-end remains slice 9.
+
+Approved by the user's instruction to continue with slice 7. Remains uncommitted.
+
+### Slice 7: non-blocking startup - implemented and approved
+
+Added the configured AddTinyFlags overload and internal TinyFlagsRegistrationWorker. Setup validates
+and copies options, preserves existing local stores, deduplicates equivalent configuration and
+rejects conflicting repeated configuration before changing registrations. The parameterless overload
+remains local-only. Hosting.Abstractions 8.0.1 is the additional direct runtime dependency.
+
+The worker waits for ApplicationStarted through a private asynchronously continued completion
+source. Only then does it compose the catalog and send one request. It owns and disposes the HTTP
+client/response, disables redirects, and links host shutdown to pending waits and I/O. Success,
+HTTP failure, timeout and exceptions finish the attempt without changing local values or stopping
+the host. Logs omit credentials, response bodies and exception messages. Retries remain slice 8.
+
+Verification: dotnet test TinyFlags.slnx --no-restore -warnaserror passed all 259 tests
+(117 generator/integration, 51 SDK runtime, 91 server integration), with no skips.
+Thirteen native net8.0 lifecycle/configuration cases use real hosts and loopback Kestrel: serving
+generated defaults while registration is blocked, one attempt after repeated configuration,
+snapshot isolation, preserved explicit values, invalid/conflicting configuration, cancellation
+before startup and during I/O, HTTP failures/redirects, timeout and connection failure.
+One full integration case runs the worker against the production Kestrel/auth/dispatcher/PostgreSQL
+path: host startup completes while a database row lock blocks registration, and releasing the
+lock persists the generated catalog in the authenticated environment.
+
+Package verification also passed with both runtime dependencies, separate net8.0 consumer behavior
+and expected TFG002 diagnostics. Artifacts: artifacts/package-tests/1c59fb4c765f482482e22040a0fa42f9.
+Packaged HTTP end-to-end remains slice 9.
+
+The user explicitly retained net8.0 for client compatibility with .NET 8 applications that later
+upgrade to .NET 10; server remains net10.0 and generator netstandard2.0. With user authorization,
+installed .NET SDK 8.0.425 globally, including ASP.NET Core 8.0.31 needed by native host tests.
+
+Approved by the user's instruction to commit and move on. Next slice adds retry classification
+and recovery using the agreed concrete TinyFlagsRetryPolicy, without Polly or custom interfaces.
 
 ## Completed slice: 0 - workspace bootstrap
 

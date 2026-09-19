@@ -10,7 +10,8 @@ Each assembly also gets a local registration catalog and contributes it automati
 its module initializes. The root application can compose these definitions through
 `TinyFlagsBootstrap`. `AddTinyFlags()` registers generated access classes from initialized
 assemblies using a shared local store. The runtime and generator pack into one NuGet package,
-verified with a separate local consumer. SDK networking is not implemented; no package is published yet.
+verified with a separate local consumer. Configured clients register their definitions in a
+background worker after host startup. Retries are not implemented, and no package is published yet.
 The server exposes authenticated definition registration over HTTP.
 
 ```csharp
@@ -126,8 +127,8 @@ callback propagates its exception; already-added services remain. Later contribu
 applied by calling AddTinyFlags again before building the container. Registration does not
 modify an already-built service provider. Configure each service collection sequentially.
 
-Generated registration performs no network I/O. Future server registration and synchronization
-will run in a background worker without making application startup wait for the server.
+Generated registration performs no network I/O. The configured overload below enables background
+server registration without making application startup wait for the server.
 
 ## Local values
 
@@ -237,7 +238,7 @@ cache reuse and invalidation, including external constants and partial declarati
 The generator tests invoke Roslyn directly. A separate package verification script tests
 automatic generator inclusion through ordinary PackageReference consumers.
 
-The full solution also includes server integration tests and requires .NET 10 SDK, .NET 8 runtime,
+The full solution also includes server integration tests and requires .NET 10 SDK, .NET 8 and ASP.NET Core 8 runtimes,
 and a running Docker engine with Linux containers:
 
 ```shell
@@ -250,7 +251,8 @@ dotnet test TinyFlags.slnx -warnaserror
 command in `Features/RegisterDefinitions`. DefinitionInput converts incoming values;
 RegistrationBatch validates duplicates and selects missing definitions; the handler reads and
 saves through DbContext. Same-kind replay preserves existing defaults and creation timestamps.
-The server targets net10.0; the NuGet client continues to target net8.0.
+The server targets net10.0; the NuGet client continues to target net8.0 so applications can use
+the same package before and after upgrading from .NET 8 to .NET 10.
 
 Registered keys are case-sensitive, scoped by environment, and limited to 400 characters.
 Boolean/string default columns are protected by a database check constraint. Invalid batches
@@ -258,8 +260,8 @@ are rejected before writing. Each nonempty registration locks its environment ro
 Read Committed transaction before reading definitions. Concurrent registrations for that
 environment run in order; other environments use independent locks. Kind conflicts raise
 `FeatureKindConflictException` with all conflicting keys and leave the entire batch unwritten.
-`POST /v1/client/definitions` exposes registration. The SDK client and background worker follow
-in later slices.
+`POST /v1/client/definitions` exposes registration. The configured SDK sends one background
+attempt after host startup; retry and recovery follow in the next slice.
 
 Client authentication is implemented in `Authentication/`. `ClientApiKey.Issue` returns a random
 256-bit secret separately from the entity; PostgreSQL stores only its SHA-256 hash. Requests use
@@ -348,6 +350,39 @@ key, prints the newly issued secret once, and exits. It requires the Development
 already-applied migrations. Repeating it creates a separate local project/key. Use the printed
 secret as the Bearer credential when calling the endpoint; ordinary startup does not seed data.
 
+## SDK registration transport
+
+The internal `TinyFlagsApiClient` accepts an HttpClient and snapshots validated
+`TinyFlagsClientOptions`: Endpoint, ApiKey and RequestTimeout (30 seconds by default).
+Endpoint is the server base URI, including any path prefix; a trailing slash is optional.
+HTTPS is required except for HTTP loopback development. URI credentials, query and fragment,
+blank/invalid credentials and invalid timeouts are rejected before sending anything.
+
+Each attempt copies the supplied definition list and sends typed Boolean/String defaults as JSON
+to `v1/client/definitions`, with a per-request Bearer header. Shared HttpClient headers and timeout
+are not changed. The caller owns HttpClient and the returned HttpResponseMessage. The request
+timeout includes buffering the response body; a shorter HttpClient timeout still takes precedence.
+HTTP status, headers (including Retry-After) and body remain available to the caller. Transport
+exceptions and cancellation propagate; the client does not retry or call EnsureSuccessStatusCode.
+
+The parameterless AddTinyFlags() remains local-only. To register definitions from a .NET host:
+
+```csharp
+builder.Services.AddTinyFlags(options =>
+{
+    options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
+    options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
+});
+```
+
+Configuration is validated and copied during setup. Repeating equivalent configuration registers
+one worker; conflicting configuration is rejected. After ApplicationStarted, the worker composes
+the initialized assemblies' catalog and sends one request. DI setup and flag getters never contact
+the server. Shutdown cancels the startup wait or request; redirects are not followed. Failures are
+logged without stopping the host or changing local values. There are no retries or value downloads
+yet. Native .NET 8 host tests verify startup and shutdown; integration tests exercise the worker
+against the actual registration server, authentication, dispatcher and PostgreSQL over Kestrel.
+
 ## Local package verification
 
 Pack the runtime and generator together:
@@ -358,8 +393,8 @@ dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
 
 The package contains the net8.0 runtime, the netstandard2.0 generator under
 `analyzers/dotnet/cs`, and this README. Consumers reference TinyFlags in each project declaring
-flags; no separate analyzer reference is needed. DI abstractions are the runtime package's
-only NuGet dependency. The generator's Roslyn dependencies are supplied by the compiler host.
+flags; no separate analyzer reference is needed. The runtime directly depends on DI abstractions
+and Hosting abstractions. The generator's Roslyn dependencies are supplied by the compiler host.
 
 Run the package smoke test from PowerShell:
 
@@ -372,6 +407,6 @@ cache, builds and runs it, then verifies that an invalid declaration produces TF
 consumer checks defaults, automatic DI across initialized assemblies, shared updates, and root
 catalog composition. The generator DLL must not be copied to the application's runtime output.
 Artifacts and the expected failing build log remain under `artifacts/package-tests`.
-The script needs NuGet access for Microsoft DI dependencies and does not publish packages.
+The script needs NuGet access for Microsoft.Extensions dependencies and does not publish packages.
 
 See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).
