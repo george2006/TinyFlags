@@ -153,7 +153,7 @@ effect. Flags absent from a replacement return to their defaults; an empty snaps
 overrides. Values must be booleans or non-null strings, and keys must not be blank.
 
 Each read observes one complete snapshot. Multiple reads can observe different versions when
-an update occurs between them. Server revisions and synchronization are future work.
+an update occurs between them. The server exposes revisioned snapshots; SDK synchronization is future work.
 
 ## Supported declarations
 
@@ -262,6 +262,13 @@ are rejected before writing. Each nonempty registration locks its environment ro
 Read Committed transaction before reading definitions. Concurrent registrations for that
 environment run in order; other environments use independent locks. Kind conflicts raise
 `FeatureKindConflictException` with all conflicting keys and leave the entire batch unwritten.
+Each environment now has a ValuesRevision. A batch inserting flags advances it once, atomically
+with those inserts; empty batches, replays, conflicts and failed writes do not advance it. Existing
+environments with definitions migrate to revision one; empty ones start at zero. This establishes
+the revision for the values endpoint and upcoming SDK synchronization worker.
+The new GetFeatureValues vertical slice reads revision and typed values through TinyDispatcher
+in one Repeatable Read transaction. Matching revisions return an unchanged result without reading
+the flags; initial empty environments return a full empty snapshot. SDK synchronization is not implemented yet.
 `POST /v1/client/definitions` exposes registration. The configured SDK registers in the background
 after host startup and retries transient failures until success, a permanent failure or shutdown.
 
@@ -273,7 +280,24 @@ the `definitions:register` permission, independent of future dashboard identitie
 Revocation is checked against the database on each new request; requests already authenticated
 may finish. Multiple keys can coexist during replacement. Key-management endpoints remain future work.
 
-The endpoint accepts UTF-8 JSON with a `definitions` array:
+`GET /v1/client/values` returns the authenticated environment's complete snapshot:
+
+```json
+{"revision":1,"values":[{"key":"Shop.Checkout.Enabled","kind":"Boolean","value":false}]}
+```
+
+Responses include `ETag: W/"<environment-id>:1"` and `Cache-Control: no-store`. Send that tag in
+`If-None-Match` to receive 304 with no body when unchanged. Weak/strong tags, lists and `*` are
+supported; another environment's tag cannot match. Malformed conditional headers return 400.
+Authentication and authorization run before conditional matching, including on 304 responses.
+
+The independent `ClientValues` policy requires the `values:read` permission from a client API key.
+The migration grants existing keys read access; new keys default to read access and can explicitly
+disable it with `ClientApiKey.Issue(..., canReadValues: false)`. Registration permissions are unchanged.
+`Request` owns conditional-header interpretation and query creation; `FeatureValuesETag` owns
+tag parsing and formatting. These concrete types belong to the GetFeatureValues vertical slice.
+
+The registration endpoint accepts UTF-8 JSON with a `definitions` array:
 
 ```json
 {

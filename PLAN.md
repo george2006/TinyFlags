@@ -1,14 +1,108 @@
 # TinyFlags
 
-## Next feature: value synchronization - design awaiting review
+## Current feature: value synchronization - slices 1 through 3 approved
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
-The proposal in docs/value-synchronization-design.md defines components, ownership, conditional
+The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
 GET, environment revisions, permissions and seven small slices. It proposes one synchronization
 worker as the SDK's only FeatureValues writer, independent of registration. Generated classes
-continue receiving the existing concrete store. No synchronization code has been implemented.
+continue receiving the existing concrete store. The user approved starting the first slice and
+requested a dedicated branch from the updated primary branch.
 
-Review the proposal before beginning slice 1. Management value edits remain a separate feature.
+Repository inspection found no remote and no main branch; the primary branch is master. Safely
+fast-forwarded master to 73f009c and created feature/value-synchronization from that exact commit.
+The original feature/server-registration branch is retained at the same commit. No work was lost.
+Management value edits remain a separate feature.
+
+### Synchronization slice 1: environment revision - implemented, verified and approved
+
+Added ProjectEnvironment.ValuesRevision and checked advancement, with a database nonnegative
+constraint. AddValuesRevision migration initializes empty environments at zero and backfills
+populated ones to one without changing definitions. The fixture can migrate isolated databases
+to a requested previous migration so upgrade behavior is exercised on the actual old schema.
+
+Registration advances the revision only when inserting missing definitions, once for the complete
+batch, in the existing environment-locked transaction and SaveChanges. Reload tracked environment
+state under the lock so an already-tracked entity cannot replace a newer persisted revision.
+No-op/replayed/conflicting batches do not advance it. Overflow fails instead of wrapping.
+
+Nine focused PostgreSQL checks passed: migration/backfill/reapplication, new/negative revisions,
+HTTP insertion/replay/conflict/scope, real constraint failure with rollback and recovery, stale
+tracked state, overflow, and simultaneous identical/incompatible/overlapping registrations.
+The first full run exposed idle connection pools accumulating across isolated test databases and
+hitting PostgreSQL's client limit (two tests failed with 53300). Disabled pooling only for disposable
+test-database connections; production settings are unchanged. The subsequent full solution run
+passed all 313 tests (117 generator/integration, 97 SDK runtime, 99 server integration), with warnings
+treated as errors and no skips, including the packaged consumer. No snapshot query, endpoint or SDK
+synchronization yet at that checkpoint. Approved by the user's instruction to move on; remains
+uncommitted because that instruction did not request a commit.
+
+### Synchronization slice 2: snapshot query - implemented, verified and approved
+
+Added Features/GetFeatureValues with the agreed query, handler, Response and FeatureValue. The
+TinyDispatcher query accepts EnvironmentId and an optional KnownRevision. The handler validates
+input and reads the revision and persisted registration defaults in one Repeatable Read transaction.
+An equal revision returns an explicit unchanged response without reading the values table; other
+revisions return a complete immutable response, including an empty initial revision-zero snapshot.
+FeatureValue owns mapping to bool/string values; results use ordinal key ordering in .NET, including
+supplementary Unicode keys. Missing environments and database errors propagate rather than becoming
+empty successful snapshots. No HTTP endpoint, permission changes, new migration or SDK work.
+
+Tests reuse TinyFlagsServerFactory's actual dispatcher/database configuration. An initial duplicate
+test bootstrap was caught by TinyDispatcher's DISP112 diagnostic and removed in favor of that reuse.
+Eight focused cases cover typed serialization, stored-default preservation, ordinal order and scope,
+empty versus unchanged, older/newer client revisions, invalid/missing environment and cancellation.
+The concurrency test uses real table/row locks: pause the values read after it reads the revision,
+commit a writer's new flag plus revision, then verify the pending reader still returns the old
+consistent snapshot and a subsequent read sees the new one. An unchanged read completes while the
+values table is locked, proving it skips that table. No mocks or production test hooks.
+
+After the bootstrap fix, the focused eight cases passed with warnings treated as errors. Full
+solution verification then passed all 321 tests (117 generator/integration, 97 SDK runtime,
+107 server integration), with no skips, including packaged registration and the new concurrency
+test. Explicitly approved by the user. Slices 1 and 2 remain uncommitted. Next is slice 3:
+read permission and the authenticated conditional GET endpoint.
+
+### Synchronization slice 3: read permission and HTTP - implemented, verified and approved
+
+Added independent CanReadValues key grants, values:read claims and the ClientValues policy.
+AddClientValuesPermission grants existing keys read access; issuance defaults to read access and
+supports explicitly denying it, without changing registration grants or stored credential hashes.
+GET /v1/client/values always authenticates and authorizes before conditional handling, derives its
+environment from the key, and returns typed snapshots or bodyless 304 responses with scoped weak
+ETags and no-store. Malformed conditional headers return 400. Query conditions now accept a list
+of known revisions or any revision so HTTP lists/wildcards stay within the consistent read transaction.
+
+The user identified excessive protocol logic in Endpoint and approved extracting two concrete types:
+Request interprets conditional headers and creates the query; FeatureValuesETag parses and formats
+the environment/revision tag, preserving opaque comparison rules. Endpoint only handles the HTTP
+flow. Both types belong to this vertical slice; no interfaces, extra layers or DI registrations.
+
+Added HTTP coverage for typed/empty snapshots, changed and unchanged tags, weak/strong/list/wildcard
+conditions, environment isolation, invalid/opaque tags, independent grants, revoked/missing keys,
+cancellation, database failures and migration of existing keys. Policy tests reject dashboard
+identities attempting to supply read permission. All 50 focused tests passed before extraction.
+The refactor's first run caught absent-header handling and a nullable warning; both were corrected.
+An overlapping rerun encountered a testhost file lock; it ended before starting full verification.
+Full solution verification passed all 347 tests (117 generator/integration, 97 SDK runtime,
+133 server integration), with warnings treated as errors and no skips, including the packaged
+consumer. git diff --check passed. Slice 3 is not yet approved; slices 1-3 remain uncommitted.
+SDK fetching and polling remain for later slices.
+
+Review refinement: simplified FeatureValuesETag.TryParse at the user's request. Strip the quotes,
+split the contents into named environment/revision text, and validate each with a separate guard.
+Exact spelling checks and invariant numeric parsing remain. All 32 GetFeatureValues integration
+tests passed after this refinement with warnings treated as errors; git diff --check passed.
+
+At the user's request, added FeatureValuesETagTests with 29 pure unit cases for weak-tag formatting,
+valid parsing including zero and Int64.MaxValue, malformed quotes/parts, invalid or alternatively
+spelled GUIDs, and invalid/noncanonical/overflowing revisions. The class uses no fixtures, HTTP,
+database or mocks and lives beside the feature's existing tests in the server test project.
+All 61 GetFeatureValues tests passed (29 unit plus 32 integration), with warnings treated as errors.
+Production code is unchanged by this test addition. The user's instruction to commit and move on
+approves slice 3 and its refinements. Commit slices 1-3 together, then begin the agreed slice 4:
+one SDK fetch and complete snapshot validation. The latest full run passed 347 tests; subsequent
+focused runs passed all 61 values tests, including 29 new unit cases (376 distinct tests verified).
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 
