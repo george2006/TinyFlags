@@ -49,7 +49,8 @@ internal sealed class TinyFlagsSynchronizationWorker : BackgroundService
     private async Task SynchronizeAsync(CancellationToken ct)
     {
         var result = await client.GetValuesAsync(TinyFlagsBootstrap.GetDefinitions(), ct: ct).ConfigureAwait(false);
-        if (result.Snapshot is not { } snapshot)
+        var snapshot = result.Snapshot;
+        if (snapshot is null)
         {
             return;
         }
