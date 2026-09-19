@@ -253,9 +253,19 @@ The server targets net10.0; the NuGet client continues to target net8.0.
 
 Registered keys are case-sensitive, scoped by environment, and limited to 400 characters.
 Boolean/string default columns are protected by a database check constraint. Invalid batches
-are rejected before writing. Concurrency coordination and the dedicated conflict exception
-are the next slice; racing initial registrations can currently fail on the unique database key.
+are rejected before writing. Each nonempty registration locks its environment row within a
+Read Committed transaction before reading definitions. Concurrent registrations for that
+environment run in order; other environments use independent locks. Kind conflicts raise
+`FeatureKindConflictException` with all conflicting keys and leave the entire batch unwritten.
 No registration endpoint or background worker is exposed yet.
+
+Client authentication is implemented in `Authentication/`. `ClientApiKey.Issue` returns a random
+256-bit secret separately from the entity; PostgreSQL stores only its SHA-256 hash. Requests use
+`Authorization: Bearer <client-api-key>`. Each key identifies one environment and its project,
+with an explicit registration grant. `ClientRegistration` requires the `ClientApiKey` scheme and
+the `definitions:register` permission, independent of future dashboard identities and roles.
+Revocation is checked against the database on each new request; requests already authenticated
+may finish. Multiple keys can coexist during replacement. Key-management endpoints remain future work.
 
 Run just the database integration tests:
 
@@ -267,7 +277,14 @@ Testcontainers starts a digest-pinned PostgreSQL 16 container with an allocated 
 gets a separate database initialized through actual migrations. Tests cover round-trips,
 migration reapplication, uniqueness, foreign keys, restricted deletion and database isolation.
 Registration tests exercise real TinyDispatcher dispatch, typed defaults, replay, scope isolation,
-input validation, duplicate handling and the database kind/default constraint.
+input validation, duplicate handling and the database kind/default constraint. Concurrency tests
+use independent service providers and observe actual PostgreSQL lock waits before releasing
+competing registrations. They cover identical and incompatible batches, independent environments,
+cancellation and registration after a conflict. Additional cases cover overlapping batches with
+different defaults and recovery after an uncommitted writer fails following insertion.
+Authentication tests exercise real ASP.NET authentication and policy evaluation with PostgreSQL:
+scope, permissions, malformed/invalid/revoked keys, replacement keys, dashboard identity isolation,
+hash-only storage and database constraints. Full HTTP pipeline tests follow with the endpoint.
 Docker being unavailable fails the run; there is no in-memory fallback or automatic skip.
 
 For manual development, start the separate compose database and apply migrations explicitly:

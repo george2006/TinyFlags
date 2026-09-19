@@ -267,7 +267,8 @@ TinyDispatcher, and PostgreSQL. Follow TinyEvents' Testcontainers approach, appl
 isolate test databases, and fail visibly when Docker is unavailable. The design document includes
 the proposed fixtures, coverage matrix, and multi-instance concurrency tests.
 
-Status: database foundation and registration command approved; concurrency is the next slice.
+Status: database foundation and registration command approved and committed; concurrency approved;
+API-key authentication implemented, verified and approved for commit with slice 3.
 No endpoint, worker or transport code yet.
 
 The user requested smaller, quick-to-review slices. The detailed design now specifies:
@@ -308,7 +309,7 @@ project/environment round-trips, migration reapplication and model alignment, sa
 uniqueness, cross-project name reuse, missing-project rejection, restricted project deletion,
 and independent databases. `docker compose config --quiet` also passed.
 
-Approved by the user's instruction to proceed to slice 2. Changes remain uncommitted.
+Approved by the user's instruction to proceed to slice 2; committed with slice 2 in `50ee8e9`.
 
 ### Slice 2: register definitions - implemented and approved
 
@@ -322,10 +323,9 @@ No new interface, mapper service, repository or dispatcher wrapper.
 
 Same-kind replay retains the original default and creation timestamp; omitted flags remain.
 Identical duplicates collapse, conflicting duplicates and malformed defaults/keys reject the
-whole batch before writes. Existing incompatible kinds currently raise InvalidOperationException.
-Slice 3 will replace that guard with the designed feature-specific exception and locking behavior.
-Concurrent first registration is not yet a supported success path: the unique key protects data
-integrity but a racing insert may fail.
+whole batch before writes. At this milestone, existing incompatible kinds raised
+InvalidOperationException and racing initial inserts could fail on the unique key. Slice 3
+below replaces that guard with the designed feature-specific exception and locking behavior.
 
 Added the RegisteredFeatures migration: composite environment/key primary key with C collation,
 environment foreign key, creation timestamp, and a check constraint enforcing matching boolean
@@ -341,6 +341,70 @@ equivalent/conflicting duplicates, malformed defaults/keys, existing kind mismat
 database check constraint. Migration/model alignment is covered by the existing integration test.
 
 Approved by the user's instruction to commit and move to slice 3.
+
+Slices 1 and 2 committed as `50ee8e9`.
+
+### Slice 3: atomic conflicts and concurrent registration - implemented and approved
+
+RegisterDefinitionsHandler validates the batch, opens a Read Committed transaction, and locks
+the environment row before reading existing definitions. All registration instances follow this
+ordering. Missing definitions are saved and committed together; failure disposes the transaction.
+Empty batches remain a no-op. RegistrationBatch reports all kind conflicts through the agreed
+FeatureKindConflictException with an immutable, ordinally sorted key list. No schema change.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 165 tests
+(117 generator/integration, 21 SDK runtime, 27 server integration), with no skips.
+Six new tests use real TinyDispatcher and PostgreSQL. They verify simultaneous identical
+registrations, one complete winner for incompatible batches, independent environments while
+one is blocked, cancellation, all conflicting keys, no partial writes and subsequent registration
+after failure. Competing requests use independent service providers; the tests observe lock waits
+in pg_stat_activity before releasing a held row lock. Registration tests share one dispatcher
+bootstrap across partial class files, avoiding the duplicate-bootstrap diagnostic.
+
+Following the concurrency review, two additional cases cover overlapping batches with different
+defaults (consistent shared defaults, both sets of unique keys, and unchanged defaults/timestamps
+on replay) and a waiting registration surviving another transaction's failure after insertion.
+The failure case stages an uncommitted writer directly through DbContext, observes the handler
+waiting, causes a real PostgreSQL division-by-zero error, and rolls back. The handler then creates
+the same key with a different kind; none of the aborted writer's rows remain. This verifies recovery
+behind an aborted writer, not fault injection into the handler's own commit/disposal path.
+
+No HTTP endpoint, authentication or worker in this slice. Approved by the user's instruction to
+move to API-key authentication. HTTP coverage follows with the endpoint in slice 5.
+
+### Slice 4: API-key authentication - implemented and approved
+
+The user agreed to separate application credentials from future dashboard identities and roles.
+Implement the agreed environment-scoped API key and registration permission, using ASP.NET's
+authentication scheme and authorization policy. No generic permission framework or custom interfaces.
+
+ClientApiKey.Issue generates a 256-bit random opaque secret, returning it separately from the
+entity. Only its SHA-256 hash is persisted. Revoke records an idempotent revocation timestamp.
+ClientApiKeyAuthenticationHandler accepts a single Authorization: Bearer credential, validates
+its format, and queries the real database without tracking. Claims contain the key ID, environment,
+project and granted registration permission; no raw credential is carried into claims or errors.
+ClientApiKeyAuthentication owns scheme/policy configuration used by Program and integration tests.
+The registration policy explicitly authenticates the client-key scheme, keeping dashboard identity
+claims from granting machine permissions. Permission is currently a concrete boolean grant on the
+key; dashboard roles and future permissions remain separate feature discussions.
+
+Added AddClientApiKeys migration with unique token hash and a restricted environment foreign key.
+Authentication reads on every request; committed revocation is observed by subsequent lookups,
+but does not cancel already-authenticated requests. Replacement keys can coexist for rotation.
+There is no key management endpoint, login flow, expiry lifecycle or registration route yet.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 181 tests
+(117 generator/integration, 21 SDK runtime, 43 server integration), with no skips.
+Sixteen new cases cover exact scope/claims across projects and environments, hash-only persistence,
+multiple keys, missing/malformed/unknown/tampered/duplicate credentials, permission denial,
+revocation and replacement keys, dashboard identity isolation, 401/403 without redirects, and
+database uniqueness/foreign-key constraints. They use real authentication services and the
+ASP.NET policy evaluator with PostgreSQL, without mocks. The initial test setup lacked routing
+services required by authorization; adding the real routing services fixed DI validation.
+Existing migration tests verify model alignment. Full HTTP middleware coverage is slice 5.
+
+Approved by the user's instruction to commit and move on. Next slice exposes the authenticated
+registration endpoint through TinyDispatcher and verifies the complete HTTP path.
 
 ## Completed slice: 0 - workspace bootstrap
 
