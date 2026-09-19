@@ -1,6 +1,6 @@
 # TinyFlags
 
-## Current feature: value synchronization - slice 5 approved
+## Current feature: value synchronization - slice 6 implemented, awaiting review
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
 The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
@@ -166,6 +166,49 @@ after startup an initial snapshot may legitimately replace them, so that old ass
 Full verification passed all 460 tests (117 generator/integration, 176 SDK runtime, 167 server),
 with warnings treated as errors and no skips, including the packaged consumer. git diff --check
 passed. Approved by the instruction to commit; committed as d325bcf.
+
+Follow-up: replaced the `result.Snapshot is not { } snapshot` pattern match in SynchronizeAsync with
+a plain null check per the user's request, matching TinyDispatcher's "boring over impressive" style
+guide. 176 SDK tests passed. Committed as f37a736.
+
+### Synchronization slice 6: refresh and recovery - implemented, awaiting review
+
+Added TinyFlagsClientOptions.RefreshInterval (default 30s, validated like RetryDelay/MaxRetryDelay,
+included in CreateSnapshot/HasSameConfigurationAs). TinyFlagsSynchronizationWorker now loops after
+its first read: PollAsync carries the last accepted FeatureSnapshot forward for each conditional GET,
+publishes only on an updated snapshot, and waits RefreshInterval plus 0-10% positive jitter after
+each attempt completes, so there is never an overlapping request. Delay is after completion, not a
+fixed timer.
+
+Failure handling distinguishes permanent from recoverable per the approved design and the user's
+explicit confirmation: CredentialsRejected, AccessDenied, RequestRejected and any unclassified
+exception stop the loop for good, same as slice 5's one-shot precedent (a malformed conditional
+header or an unanticipated bug will not resolve itself by repeating). InvalidResponse (malformed
+JSON body, or a 304 with no accepted snapshot yet) logs and retries on the next normal cycle without
+a second retry loop in the worker, matching the design doc's recovery requirement. Transient
+network/408/429/5xx failures remain fully handled inside the existing TinyFlagsApiClient/
+TinyFlagsRetryPolicy before ever reaching the worker.
+
+Rewrote TinyFlags.Tests/SynchronizationWorkerTests.cs for the recurring loop: replaced waits on a
+one-shot ExecuteTask completion with a polling WaitUntilAsync helper for observable state, since the
+task now runs for the host's lifetime on success. Split the old single "rejected or invalid" theory
+into a permanent-failure case (401/403, loop stops, ExecuteTask completes) and a new
+recover-on-next-refresh case (malformed 200 body, 304 without an accepted snapshot). Added tests for
+a second poll publishing a newer revision with the correct If-None-Match carried forward, and for
+shutdown during the refresh wait stopping promptly with no further request. Added a RefreshInterval
+validation theory to TinyFlagsClientOptionsTests.cs. Updated the equivalent real-HTTP/PostgreSQL case
+in TinyFlags.Server.IntegrationTests the same way.
+
+While reviewing PollAsync's per-iteration catch, found that an unfiltered `catch (Exception error)`
+would also catch OperationCanceledException during shutdown, logging a spurious "synchronization
+failed" warning on every graceful stop instead of the silent, expected shutdown the outer ExecuteAsync
+handler documents. Added an explicit `catch (OperationCanceledException) { throw; }` before the
+generic catch so shutdown still propagates to the existing outer handler unchanged. No test previously
+caught this because the observable state (values preserved, task completes) was identical either way;
+this is a log-quality/intent fix, not a behavior fix.
+
+Full verification passed all 465 tests (117 generator, 181 SDK runtime, 167 server), with warnings
+treated as errors and no skips. Slice 6 remains uncommitted and awaits review.
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 

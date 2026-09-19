@@ -40,7 +40,7 @@ public sealed class SynchronizationWorkerTests
             Assert.Equal("Local", flags.Label);
 
             release.TrySetResult();
-            await worker.ExecuteTask.WaitAsync(timeout.Token);
+            await WaitUntilAsync(() => flags.Enabled, timeout.Token);
 
             Assert.Same(flags, host.Services.GetRequiredService<StartupFeatureFlags>());
             Assert.True(flags.Enabled);
@@ -64,15 +64,15 @@ public sealed class SynchronizationWorkerTests
             await Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted);
         });
         using var host = CreateHost(server);
+        var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
         try
         {
             await host.StartAsync(timeout.Token);
             await registrationReceived.Task.WaitAsync(timeout.Token);
-            await GetWorker(host).ExecuteTask!.WaitAsync(timeout.Token);
+            await WaitUntilAsync(() => flags.Enabled, timeout.Token);
 
             var registration = Assert.Single(host.Services.GetServices<IHostedService>().OfType<TinyFlagsRegistrationWorker>());
             Assert.False(registration.ExecuteTask!.IsCompleted);
-            Assert.True(host.Services.GetRequiredService<StartupFeatureFlags>().Enabled);
         }
         finally
         {
@@ -98,12 +98,11 @@ public sealed class SynchronizationWorkerTests
         var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
 
         await host.StartAsync(timeout.Token);
-        await GetWorker(host).ExecuteTask!.WaitAsync(timeout.Token);
+        await WaitUntilAsync(() => flags.Label == (empty ? "Local" : "Remote"), timeout.Token);
 
         Assert.Equal(1, requests);
         Assert.Same(values, host.Services.GetRequiredService<FeatureValues>());
         Assert.Equal(!empty, flags.Enabled);
-        Assert.Equal(empty ? "Local" : "Remote", flags.Label);
         Assert.False(values.GetBoolean("Removed", false));
         await host.StopAsync(timeout.Token);
     }
@@ -111,21 +110,15 @@ public sealed class SynchronizationWorkerTests
     [Theory]
     [InlineData(401)]
     [InlineData(403)]
-    [InlineData(200)]
-    [InlineData(304)]
-    public async Task Rejected_or_invalid_initial_reads_preserve_existing_values_and_keep_the_host_running(int status)
+    public async Task Permanent_failures_stop_the_refresh_loop_and_keep_the_host_running(int status)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var requests = 0;
-        await using var server = await StartServerAsync(async context =>
+        await using var server = await StartServerAsync(context =>
         {
             Interlocked.Increment(ref requests);
             context.Response.StatusCode = status;
-            if (status == 200)
-            {
-                context.Response.ContentType = "application/json";
-                await context.Response.WriteAsync("{", context.RequestAborted);
-            }
+            return Task.CompletedTask;
         });
         var values = new FeatureValues();
         values.ReplaceSnapshot(new Dictionary<string, object> { [EnabledKey] = true, [LabelKey] = "Warm" });
@@ -138,6 +131,41 @@ public sealed class SynchronizationWorkerTests
         Assert.True(host.Services.GetRequiredService<StartupFeatureFlags>().Enabled);
         Assert.Equal("Warm", host.Services.GetRequiredService<StartupFeatureFlags>().Label);
         Assert.False(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.IsCancellationRequested);
+        await host.StopAsync(timeout.Token);
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(304)]
+    public async Task Invalid_payloads_preserve_values_and_recover_on_a_later_refresh(int firstStatus)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var requests = 0;
+        await using var server = await StartServerAsync(async context =>
+        {
+            if (Interlocked.Increment(ref requests) == 1)
+            {
+                context.Response.StatusCode = firstStatus;
+                if (firstStatus == 200)
+                {
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync("{", context.RequestAborted);
+                }
+                return;
+            }
+            await WriteSnapshotAsync(context);
+        });
+        var values = new FeatureValues();
+        values.ReplaceSnapshot(new Dictionary<string, object> { [EnabledKey] = true, [LabelKey] = "Warm" });
+        using var host = CreateHost(server, values, refreshInterval: TimeSpan.FromMilliseconds(20));
+        var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
+
+        await host.StartAsync(timeout.Token);
+        Assert.Equal("Warm", flags.Label);
+        await WaitUntilAsync(() => flags.Label == "Remote", timeout.Token);
+
+        Assert.True(requests >= 2);
+        Assert.True(flags.Enabled);
         await host.StopAsync(timeout.Token);
     }
 
@@ -156,13 +184,64 @@ public sealed class SynchronizationWorkerTests
             await WriteSnapshotAsync(context);
         });
         using var host = CreateHost(server);
+        var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
 
         await host.StartAsync(timeout.Token);
-        await GetWorker(host).ExecuteTask!.WaitAsync(timeout.Token);
+        await WaitUntilAsync(() => flags.Enabled, timeout.Token);
 
         Assert.Equal(2, requests);
-        Assert.True(host.Services.GetRequiredService<StartupFeatureFlags>().Enabled);
         await host.StopAsync(timeout.Token);
+    }
+
+    [Fact]
+    public async Task Recurring_refresh_fetches_again_and_publishes_a_newer_revision()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var requests = 0;
+        string? secondRequestConditionalHeader = null;
+        await using var server = await StartServerAsync(async context =>
+        {
+            var attempt = Interlocked.Increment(ref requests);
+            if (attempt == 2)
+            {
+                secondRequestConditionalHeader = context.Request.Headers.IfNoneMatch.ToString();
+            }
+            await WriteSnapshotAsync(context, revision: attempt, label: attempt == 1 ? "Remote" : "RemoteAgain");
+        });
+        using var host = CreateHost(server, refreshInterval: TimeSpan.FromMilliseconds(20));
+        var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
+
+        await host.StartAsync(timeout.Token);
+        await WaitUntilAsync(() => flags.Label == "RemoteAgain", timeout.Token);
+
+        Assert.True(requests >= 2);
+        Assert.Equal("W/\"550e8400-e29b-41d4-a716-446655440000:1\"", secondRequestConditionalHeader);
+        await host.StopAsync(timeout.Token);
+    }
+
+    [Fact]
+    public async Task Shutdown_during_the_refresh_wait_stops_without_a_further_request()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var requests = 0;
+        await using var server = await StartServerAsync(async context =>
+        {
+            Interlocked.Increment(ref requests);
+            await WriteSnapshotAsync(context);
+        });
+        using var host = CreateHost(server);
+        var flags = host.Services.GetRequiredService<StartupFeatureFlags>();
+
+        await host.StartAsync(timeout.Token);
+        await WaitUntilAsync(() => flags.Enabled, timeout.Token);
+        Assert.Equal(1, requests);
+        var worker = GetWorker(host);
+        Assert.False(worker.ExecuteTask!.IsCompleted);
+
+        await host.StopAsync(timeout.Token).WaitAsync(timeout.Token);
+
+        Assert.Equal(1, requests);
+        Assert.True(worker.ExecuteTask.IsCompleted);
     }
 
     [Fact]
@@ -215,10 +294,19 @@ public sealed class SynchronizationWorkerTests
         Assert.Equal("Warm", host.Services.GetRequiredService<StartupFeatureFlags>().Label);
     }
 
+    private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken ct)
+    {
+        while (!condition())
+        {
+            await Task.Delay(5, ct).ConfigureAwait(false);
+        }
+    }
+
     private static TinyFlagsSynchronizationWorker GetWorker(IHost host)
         => Assert.Single(host.Services.GetServices<IHostedService>().OfType<TinyFlagsSynchronizationWorker>());
 
-    private static IHost CreateHost(WebApplication server, FeatureValues? values = null, bool configureTwice = false)
+    private static IHost CreateHost(WebApplication server, FeatureValues? values = null, bool configureTwice = false,
+        TimeSpan? refreshInterval = null)
     {
         var builder = Host.CreateApplicationBuilder();
         if (values is not null)
@@ -231,6 +319,7 @@ public sealed class SynchronizationWorkerTests
             options.ApiKey = "test-key";
             options.RetryDelay = TimeSpan.FromMilliseconds(20);
             options.MaxRetryDelay = TimeSpan.FromMilliseconds(40);
+            options.RefreshInterval = refreshInterval ?? TimeSpan.FromSeconds(10);
         }
         builder.Services.AddTinyFlags(Configure);
         if (configureTwice)
@@ -255,15 +344,15 @@ public sealed class SynchronizationWorkerTests
         return server;
     }
 
-    private static Task WriteSnapshotAsync(HttpContext context, bool empty = false)
+    private static Task WriteSnapshotAsync(HttpContext context, bool empty = false, long revision = 1, string label = "Remote")
     {
-        var revision = empty ? 0 : 1;
-        context.Response.Headers.ETag = $"W/\"550e8400-e29b-41d4-a716-446655440000:{revision}\"";
+        var effectiveRevision = empty ? 0 : revision;
+        context.Response.Headers.ETag = $"W/\"550e8400-e29b-41d4-a716-446655440000:{effectiveRevision}\"";
         object[] values = empty ? [] :
         [
             new { key = EnabledKey, kind = "Boolean", value = true },
-            new { key = LabelKey, kind = "String", value = "Remote" }
+            new { key = LabelKey, kind = "String", value = label }
         ];
-        return context.Response.WriteAsJsonAsync(new { revision, values }, cancellationToken: context.RequestAborted);
+        return context.Response.WriteAsJsonAsync(new { revision = effectiveRevision, values }, cancellationToken: context.RequestAborted);
     }
 }

@@ -50,6 +50,23 @@ public sealed class TinyFlagsClientOptionsTests
     }
 
     [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(2147483648L)]
+    public void Invalid_refresh_interval_is_rejected_before_startup(long milliseconds)
+    {
+        var options = new TinyFlagsClientOptions
+        {
+            Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key",
+            RefreshInterval = TimeSpan.FromMilliseconds(milliseconds)
+        };
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => options.CreateSnapshot());
+
+        Assert.Equal(nameof(TinyFlagsClientOptions.RefreshInterval), error.ParamName);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("relative/path")]
     [InlineData("http://flags.example.com")]

@@ -20,6 +20,8 @@ public sealed class TinyFlagsClientOptions
 
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
+    public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromSeconds(30);
+
     internal TinyFlagsClientOptions CreateSnapshot()
     {
         Validate();
@@ -30,14 +32,16 @@ public sealed class TinyFlagsClientOptions
             RequestTimeout = RequestTimeout,
             MaxSnapshotBytes = MaxSnapshotBytes,
             RetryDelay = RetryDelay,
-            MaxRetryDelay = MaxRetryDelay
+            MaxRetryDelay = MaxRetryDelay,
+            RefreshInterval = RefreshInterval
         };
     }
 
     internal bool HasSameConfigurationAs(TinyFlagsClientOptions other)
         => Endpoint == other.Endpoint && ApiKey == other.ApiKey && RequestTimeout == other.RequestTimeout
             && MaxSnapshotBytes == other.MaxSnapshotBytes
-            && RetryDelay == other.RetryDelay && MaxRetryDelay == other.MaxRetryDelay;
+            && RetryDelay == other.RetryDelay && MaxRetryDelay == other.MaxRetryDelay
+            && RefreshInterval == other.RefreshInterval;
 
     internal void Validate()
     {
@@ -71,6 +75,11 @@ public sealed class TinyFlagsClientOptions
         if (MaxRetryDelay < RetryDelay || MaxRetryDelay > TimeSpan.FromMilliseconds(int.MaxValue))
         {
             throw new ArgumentOutOfRangeException(nameof(MaxRetryDelay), "MaxRetryDelay must be at least RetryDelay and no greater than Int32.MaxValue milliseconds.");
+        }
+
+        if (RefreshInterval <= TimeSpan.Zero || RefreshInterval > TimeSpan.FromMilliseconds(int.MaxValue))
+        {
+            throw new ArgumentOutOfRangeException(nameof(RefreshInterval), "RefreshInterval must be positive and no greater than Int32.MaxValue milliseconds.");
         }
     }
 }
