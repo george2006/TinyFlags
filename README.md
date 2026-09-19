@@ -392,7 +392,8 @@ a minimum of 1 millisecond. Both settings are validated and included in configur
 Valid Retry-After values on 429/503 can extend the wait beyond the normal cap; malformed or expired
 values retain ordinary backoff. Long waits remain cancellable. The same catalog is retried, with
 no fixed attempt limit, and responses are disposed before waiting. The concrete TinyFlagsRetryPolicy
-calculates retry decisions; the worker owns calls and waits. There is no Polly dependency.
+owns the entire retry operation: attempts, classification, delays and cancellation. The worker
+supplies the HTTP call and handles/disposes the final response. There is no Polly dependency.
 
 ## Local package verification
 

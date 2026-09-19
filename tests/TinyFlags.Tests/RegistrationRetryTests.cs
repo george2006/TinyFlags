@@ -1,13 +1,48 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags.Tests;
 
 public sealed partial class RegistrationWorkerTests
 {
+    [Theory]
+    [InlineData(200)]
+    [InlineData(409)]
+    public async Task Retry_operation_disposes_transient_responses_and_returns_the_final_response_to_its_caller(int finalStatus)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var requests = 0;
+        await using var server = await StartServerAsync(async context =>
+        {
+            context.Response.StatusCode = Interlocked.Increment(ref requests) == 1 ? 503 : finalStatus;
+            await context.Response.WriteAsync("response body", context.RequestAborted);
+        });
+        using var http = new HttpClient();
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions
+        {
+            RetryDelay = TimeSpan.FromMilliseconds(10), MaxRetryDelay = TimeSpan.FromMilliseconds(20)
+        });
+        var responses = new List<HttpResponseMessage>();
+
+        using var final = await retry.ExecuteAsync(async ct =>
+        {
+            var response = await http.PostAsync(server.Urls.Single() + "/v1/client/definitions", null, ct);
+            responses.Add(response);
+            return response;
+        }, NullLogger.Instance, timeout.Token);
+
+        Assert.Equal(2, requests);
+        Assert.Equal((HttpStatusCode)finalStatus, final.StatusCode);
+        Assert.Same(responses[1], final);
+        Assert.Equal("response body", await final.Content.ReadAsStringAsync(timeout.Token));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => responses[0].Content.ReadAsStringAsync());
+    }
+
     [Theory]
     [InlineData(408)]
     [InlineData(429)]

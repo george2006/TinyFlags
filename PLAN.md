@@ -1,5 +1,30 @@
 # TinyFlags
 
+## Next feature: value synchronization - design awaiting review
+
+Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
+The proposal in docs/value-synchronization-design.md defines components, ownership, conditional
+GET, environment revisions, permissions and seven small slices. It proposes one synchronization
+worker as the SDK's only FeatureValues writer, independent of registration. Generated classes
+continue receiving the existing concrete store. No synchronization code has been implemented.
+
+Review the proposal before beginning slice 1. Management value edits remain a separate feature.
+
+## Completed refinement: retry operation ownership - implemented, verified and approved
+
+The user pointed out that extracting classification alone left retry mechanics in the worker.
+Move the full operation into the existing concrete TinyFlagsRetryPolicy: ExecuteAsync accepts
+the HTTP call, logger and cancellation token; owns attempts, response/exception classification,
+backoff, cancellation and disposal of retry responses; returns the final response to its caller.
+The registration worker now waits for startup, submits registration and handles the final result.
+No new class/interface/dependency. The existing full suite passed all 305 tests, including the
+real HTTP, lost-response and packaged scenarios. After adding two HTTP cases for retry-response
+disposal and final-response ownership on success/permanent failure, all 97 SDK tests passed
+(307 distinct tests verified across those runs). Warnings were treated as errors. This correction
+takes priority over implementing synchronization. Approved by the user's instruction to commit
+and move on. The synchronization document remains a proposal for review; no synchronization
+implementation has started.
+
 ## Completed slice: 1 - declarations and diagnostics
 
 Approved by the user: implement the first slice of the revised six-slice feature below.
