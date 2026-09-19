@@ -267,9 +267,8 @@ TinyDispatcher, and PostgreSQL. Follow TinyEvents' Testcontainers approach, appl
 isolate test databases, and fail visibly when Docker is unavailable. The design document includes
 the proposed fixtures, coverage matrix, and multi-instance concurrency tests.
 
-Status: database foundation and registration command approved and committed; concurrency approved;
-API-key authentication implemented, verified and approved for commit with slice 3.
-No endpoint, worker or transport code yet.
+Status: slices 1 through 4 approved and committed; slices 3/4 committed as `3bdd23e`.
+The authenticated endpoint and shared test setup are approved for commit. No SDK HTTP client or worker yet.
 
 The user requested smaller, quick-to-review slices. The detailed design now specifies:
 
@@ -405,6 +404,58 @@ Existing migration tests verify model alignment. Full HTTP middleware coverage i
 
 Approved by the user's instruction to commit and move on. Next slice exposes the authenticated
 registration endpoint through TinyDispatcher and verifies the complete HTTP path.
+
+### Slice 5: authenticated registration endpoint - implemented and approved
+
+Added Endpoint and Request alongside the existing registration command. POST /v1/client/definitions
+requires the client registration policy, derives the environment from authenticated claims and
+dispatches through the production TinyDispatcher pipeline. Request bounds are 1 MiB body bytes,
+1,000 definitions, 400 key characters and 4,096 string-default characters. Actual stream reads are
+bounded even without Content-Length. Unknown envelope members, including environment selectors,
+are rejected. Success returns 204; empty batches remain successful no-ops.
+
+Invalid input maps to 400, kind conflicts to 409 with all conflicting keys, excessive body/batch
+size to 413 and non-JSON content to 415. Existing authentication/policy provide 401 and 403.
+Exception handling runs before authentication because it also accesses PostgreSQL. Transient
+Npgsql failures and the EF query/update wrappers map to generic 503; unexpected failures remain
+generic 500. Cancellation flows from the HTTP request to dispatch and database waits.
+
+DevelopmentSetup supplies an explicit --seed-development command, restricted to Development.
+It creates a local project/environment/key in one SaveChanges, prints the issued secret once,
+and exits. It requires migrations to be applied first; ordinary startup does not create data.
+
+Added TinyFlagsServerFactory using WebApplicationFactory and the unchanged production services.
+Only environment/connection configuration differs. Host configuration is supplied before Program
+reads its connection string; a late application configuration override initially failed startup.
+Added Microsoft.AspNetCore.Mvc.Testing 10.0.4. No new database migration in this slice.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed all 217 tests
+(117 generator/integration, 21 SDK runtime, 79 server integration), with no skips.
+Thirty-six new cases cover the full HTTP pipeline: registration/replay/default preservation,
+empty batches, duplicate/case behavior, malformed input, byte/count/value limits (including unknown
+body length), 401/403, scope isolation, atomic 409, and two independent hosts with simultaneous
+identical/incompatible batches. Cancellation releases blocked database work without writes.
+Fault tests stop a private container during authentication, terminate a blocked registration's
+database connection, and corrupt only an isolated test schema to verify 503 versus 500 without
+leaking internal details. These tests caught and fixed EF's transient-query exception wrapper
+initially being classified as 500. The local setup's persisted key is verified through HTTP.
+
+Before committing, the user approved extracting shared test setup. Added the concrete DatabaseSeed
+in test Infrastructure: CreateEnvironmentAsync creates a project/environment and returns its ID;
+CreateClientAsync creates a project/environment/key together and returns the key plus secret.
+Both persist through real DbContext instances in the test's isolated database. Authentication,
+handler, concurrency and HTTP tests now share this setup instead of three private seed helpers.
+TinyFlagsServerFactory.CreateAuthenticatedClient configures the real HttpClient's Bearer header;
+missing-credential tests explicitly use the factory's ordinary CreateClient method.
+
+Scenario-specific setup (revocation, related environments, contention and faults), dispatch helpers,
+requests and assertions remain in their tests. Docker ownership/database isolation stays with
+PostgreSqlFixture. No production changes or new interfaces from this refactor. Verification after
+extraction: the same 217 tests passed with warnings treated as errors, including all 79 server
+integration tests; no tests were removed or skipped.
+
+Approved by the user's instruction to commit and move on. Next slice adds one HTTP registration
+attempt from the SDK client.
 
 ## Completed slice: 0 - workspace bootstrap
 

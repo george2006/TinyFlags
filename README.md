@@ -10,7 +10,8 @@ Each assembly also gets a local registration catalog and contributes it automati
 its module initializes. The root application can compose these definitions through
 `TinyFlagsBootstrap`. `AddTinyFlags()` registers generated access classes from initialized
 assemblies using a shared local store. The runtime and generator pack into one NuGet package,
-verified with a separate local consumer. Networking is not implemented; no package is published yet.
+verified with a separate local consumer. SDK networking is not implemented; no package is published yet.
+The server exposes authenticated definition registration over HTTP.
 
 ```csharp
 using TinyFlags;
@@ -257,7 +258,8 @@ are rejected before writing. Each nonempty registration locks its environment ro
 Read Committed transaction before reading definitions. Concurrent registrations for that
 environment run in order; other environments use independent locks. Kind conflicts raise
 `FeatureKindConflictException` with all conflicting keys and leave the entire batch unwritten.
-No registration endpoint or background worker is exposed yet.
+`POST /v1/client/definitions` exposes registration. The SDK client and background worker follow
+in later slices.
 
 Client authentication is implemented in `Authentication/`. `ClientApiKey.Issue` returns a random
 256-bit secret separately from the entity; PostgreSQL stores only its SHA-256 hash. Requests use
@@ -267,7 +269,25 @@ the `definitions:register` permission, independent of future dashboard identitie
 Revocation is checked against the database on each new request; requests already authenticated
 may finish. Multiple keys can coexist during replacement. Key-management endpoints remain future work.
 
-Run just the database integration tests:
+The endpoint accepts UTF-8 JSON with a `definitions` array:
+
+```json
+{
+  "definitions": [
+    { "key": "Shop.Checkout.Enabled", "kind": "Boolean", "defaultValue": false }
+  ]
+}
+```
+
+The API key supplies the environment; unknown envelope fields such as `environmentId` are
+rejected. Limits are 1 MiB of body bytes (including requests without Content-Length), 1,000
+definitions, 400 characters per key, and 4,096 characters per string default. An empty list
+succeeds. Registration returns 204 after commit; invalid input returns 400, authentication 401,
+insufficient permission 403, kind conflict 409 with `conflictingKeys`, excessive body/batch size
+413, and non-JSON content 415. Transient database failures return 503, including during key
+authentication. Unexpected server errors return 500 with no database details in the response.
+
+Run just the server integration tests:
 
 ```shell
 dotnet test tests/TinyFlags.Server.IntegrationTests -warnaserror
@@ -284,8 +304,28 @@ cancellation and registration after a conflict. Additional cases cover overlappi
 different defaults and recovery after an uncommitted writer fails following insertion.
 Authentication tests exercise real ASP.NET authentication and policy evaluation with PostgreSQL:
 scope, permissions, malformed/invalid/revoked keys, replacement keys, dashboard identity isolation,
-hash-only storage and database constraints. Full HTTP pipeline tests follow with the endpoint.
+hash-only storage and database constraints. HTTP tests run the actual application using
+WebApplicationFactory, changing only configuration. They cover the full auth/dispatcher/database
+path, malformed and oversized requests, scope isolation, cancellation, and two hosts contending
+on the same database. Outage tests stop their own container or terminate only a test request's
+database connection; unexpected database errors remain 500.
 Docker being unavailable fails the run; there is no in-memory fallback or automatic skip.
+
+Test setup uses three concrete responsibilities: PostgreSqlFixture owns Docker and isolated
+migrated databases; DatabaseSeed persists routine project/environment/client setup; and
+TinyFlagsServerFactory hosts the application and creates authenticated clients:
+
+```csharp
+var options = await database.CreateDatabaseAsync();
+var seed = new DatabaseSeed(options);
+var credential = await seed.CreateClientAsync(canRegisterDefinitions: true);
+await using var server = new TinyFlagsServerFactory(options);
+using var client = server.CreateAuthenticatedClient(credential.Secret);
+```
+
+Each seed call creates a fresh project and environment within that test's database. Tests keep
+special relationships, revocation, concurrency controls, requests and assertions explicit.
+Handler and authentication tests reuse DatabaseSeed without needing an HTTP host.
 
 For manual development, start the separate compose database and apply migrations explicitly:
 
@@ -293,6 +333,7 @@ For manual development, start the separate compose database and apply migrations
 docker compose up -d --wait
 dotnet tool restore
 dotnet ef database update --project src/TinyFlags.Server -- --environment Development
+dotnet run --project src/TinyFlags.Server -- --environment Development --seed-development
 dotnet run --project src/TinyFlags.Server -- --environment Development
 ```
 
@@ -300,7 +341,12 @@ The compose database listens on localhost:54324, with local development credenti
 `appsettings.Development.json`. Its named volume persists across normal container stops.
 Integration tests use their own containers and never reset this database. Stop the development
 container with `docker compose down`; that preserves its volume. Outside Development, provide
-`ConnectionStrings__TinyFlags`. Server startup does not run migrations or expose business routes yet.
+`ConnectionStrings__TinyFlags`. Server startup does not run migrations.
+
+The explicit `--seed-development` command creates a new local project, environment and authorized
+key, prints the newly issued secret once, and exits. It requires the Development environment and
+already-applied migrations. Repeating it creates a separate local project/key. Use the printed
+secret as the Bearer credential when calling the endpoint; ordinary startup does not seed data.
 
 ## Local package verification
 
