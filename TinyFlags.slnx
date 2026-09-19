@@ -4,13 +4,17 @@
     <File Path="WORKING-AGREEMENT.md" />
     <File Path="PLAN.md" />
     <File Path="README.md" />
+    <File Path="docker-compose.yml" />
+    <File Path="docs/server-registration-design.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/TinyFlags/TinyFlags.csproj" />
     <Project Path="src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" />
+    <Project Path="src/TinyFlags.Server/TinyFlags.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TinyFlags.Tests/TinyFlags.Tests.csproj" />
     <Project Path="tests/TinyFlags.SourceGen.Tests/TinyFlags.SourceGen.Tests.csproj" />
+    <Project Path="tests/TinyFlags.Server.IntegrationTests/TinyFlags.Server.IntegrationTests.csproj" />
   </Folder>
 </Solution>

@@ -244,6 +244,104 @@ All 138 existing tests also pass with `dotnet test TinyFlags.slnx -warnaserror`.
 Status: implemented, verified, and approved by the user's instruction to commit and move on.
 No server or synchronization added.
 
+## Current feature: background server registration
+
+Branch: `feature/server-registration`. The user requested design review before implementation,
+then explicitly requested TinyDispatcher and vertical slices for the API. TinyEvents is to be
+used only when a concrete need arises; it is not part of the initial registration transaction.
+
+The full proposal is in [server-registration-design.md](docs/server-registration-design.md).
+It supersedes the earlier client-first sketch: implement the server's registration command and
+persistence, expose its authenticated endpoint, then connect the HTTP client and background
+worker. Registration runs in the worker after a startup signal and never waits on server I/O
+on the application's startup path. Value synchronization remains the following feature.
+
+The user approved starting slice 1 with PostgreSQL + EF Core and one server project. Remaining
+slices cover environment-scoped create-only definitions, transactionally safe replay/concurrency,
+API-key scope, and the concrete types documented in the proposal.
+TinyDispatcher use and the vertical-slice direction are already user requirements.
+
+The user also requires Docker and a dedicated `TinyFlags.Server.IntegrationTests` project.
+Every exposed server interaction must have integration coverage through HTTP, real authentication,
+TinyDispatcher, and PostgreSQL. Follow TinyEvents' Testcontainers approach, apply actual migrations,
+isolate test databases, and fail visibly when Docker is unavailable. The design document includes
+the proposed fixtures, coverage matrix, and multi-instance concurrency tests.
+
+Status: database foundation and registration command approved; concurrency is the next slice.
+No endpoint, worker or transport code yet.
+
+The user requested smaller, quick-to-review slices. The detailed design now specifies:
+
+1. Docker/database foundation and real persistence tests.
+2. TinyDispatcher registration command: create and replay.
+3. Atomic conflicts and concurrent registration.
+4. API-key authentication against the real database.
+5. Authenticated endpoint with complete HTTP integration coverage.
+6. One HTTP registration attempt from the concrete SDK client.
+7. Non-blocking startup signal and single-attempt worker lifecycle.
+8. Retry, cancellation and recovery.
+9. Packaged end-to-end registration against the server and Docker database.
+
+Each slice stops for review. This breakdown replaces the earlier broader five-step proposal.
+
+### Slice 1: database foundation - implemented and approved
+
+Added TinyFlags.Server and TinyFlags.Server.IntegrationTests to the solution, targeting net10.0.
+The existing SDK remains net8.0. Project and ProjectEnvironment use application-assigned GUIDs;
+EF mappings enforce environment-name uniqueness within a project, required names, and a foreign
+key that restricts deletion of a project with environments. Environment names use C collation.
+The actual generated migration and model snapshot are checked into the working tree.
+
+PostgreSqlFixture owns a digest-pinned PostgreSQL 16 Docker container and creates a fresh database
+per test, applying real migrations. Container disposal reclaims those test databases. Docker
+must be running; integration tests do not silently skip. A separate compose file provides a
+persistent local development database on localhost:54324. Program configures DbContext without
+running migrations at startup. The local dotnet-ef tool is pinned to 10.0.4, matching EF runtime.
+
+Updated Testcontainers.PostgreSql to 4.15.0: its dependency set resolves the SSH.NET vulnerability
+warning encountered with 4.12.0. Restore/build/test now pass with warnings treated as errors.
+See the [upstream package dependencies](https://www.nuget.org/packages/Testcontainers/4.15.0).
+
+Verification on 2026-09-19: `dotnet test TinyFlags.slnx -warnaserror` passed 144 tests
+(117 generator/integration, 21 local runtime, 6 server integration). Server tests verify persisted
+project/environment round-trips, migration reapplication and model alignment, same-project name
+uniqueness, cross-project name reuse, missing-project rejection, restricted project deletion,
+and independent databases. `docker compose config --quiet` also passed.
+
+Approved by the user's instruction to proceed to slice 2. Changes remain uncommitted.
+
+### Slice 2: register definitions - implemented and approved
+
+Added TinyDispatcher 1.3.0-beta.3, matching Feelings, and composed generated registrations in
+Program. Features/RegisterDefinitions owns the command, input, handler, batch and persisted entity.
+The user requested the OOP extraction during review: DefinitionInput converts itself to a
+RegisteredFeature, RegistrationBatch validates/normalizes the full batch and determines missing
+definitions, and RegisteredFeature compares definition contents. The handler orchestrates the
+batch, reads existing definitions directly through DbContext, and saves missing rows once.
+No new interface, mapper service, repository or dispatcher wrapper.
+
+Same-kind replay retains the original default and creation timestamp; omitted flags remain.
+Identical duplicates collapse, conflicting duplicates and malformed defaults/keys reject the
+whole batch before writes. Existing incompatible kinds currently raise InvalidOperationException.
+Slice 3 will replace that guard with the designed feature-specific exception and locking behavior.
+Concurrent first registration is not yet a supported success path: the unique key protects data
+integrity but a racing insert may fail.
+
+Added the RegisteredFeatures migration: composite environment/key primary key with C collation,
+environment foreign key, creation timestamp, and a check constraint enforcing matching boolean
+or string default columns. Keys are limited to 400 characters; blank keys are rejected and exact
+case is preserved. There is no dependency on the TinyFlags SDK from the server.
+
+Verification: `dotnet test TinyFlags.slnx --no-restore -warnaserror` passed 159 tests
+(117 generator/integration, 21 SDK runtime, 21 server integration), including after the OOP
+refactor with the same behavior tests. Fifteen new cases use real TinyDispatcher with generated
+registrations and a fresh DI scope per dispatch. They cover typed/empty defaults, timestamps,
+replay, changed defaults, omitted flags, empty batches, project/environment isolation, key casing,
+equivalent/conflicting duplicates, malformed defaults/keys, existing kind mismatch and the
+database check constraint. Migration/model alignment is covered by the existing integration test.
+
+Approved by the user's instruction to commit and move to slice 3.
+
 ## Completed slice: 0 - workspace bootstrap
 
 Requested: a new `TinyFlags` folder, solution, `src/`, and `tests/` under the shared repos folder.

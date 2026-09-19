@@ -236,9 +236,54 @@ cache reuse and invalidation, including external constants and partial declarati
 The generator tests invoke Roslyn directly. A separate package verification script tests
 automatic generator inclusion through ordinary PackageReference consumers.
 
+The full solution also includes server integration tests and requires .NET 10 SDK, .NET 8 runtime,
+and a running Docker engine with Linux containers:
+
 ```shell
-dotnet test TinyFlags.slnx
+dotnet test TinyFlags.slnx -warnaserror
 ```
+
+## Server registration foundation
+
+`TinyFlags.Server` contains project/environment persistence and the TinyDispatcher registration
+command in `Features/RegisterDefinitions`. DefinitionInput converts incoming values;
+RegistrationBatch validates duplicates and selects missing definitions; the handler reads and
+saves through DbContext. Same-kind replay preserves existing defaults and creation timestamps.
+The server targets net10.0; the NuGet client continues to target net8.0.
+
+Registered keys are case-sensitive, scoped by environment, and limited to 400 characters.
+Boolean/string default columns are protected by a database check constraint. Invalid batches
+are rejected before writing. Concurrency coordination and the dedicated conflict exception
+are the next slice; racing initial registrations can currently fail on the unique database key.
+No registration endpoint or background worker is exposed yet.
+
+Run just the database integration tests:
+
+```shell
+dotnet test tests/TinyFlags.Server.IntegrationTests -warnaserror
+```
+
+Testcontainers starts a digest-pinned PostgreSQL 16 container with an allocated port. Each test
+gets a separate database initialized through actual migrations. Tests cover round-trips,
+migration reapplication, uniqueness, foreign keys, restricted deletion and database isolation.
+Registration tests exercise real TinyDispatcher dispatch, typed defaults, replay, scope isolation,
+input validation, duplicate handling and the database kind/default constraint.
+Docker being unavailable fails the run; there is no in-memory fallback or automatic skip.
+
+For manual development, start the separate compose database and apply migrations explicitly:
+
+```shell
+docker compose up -d --wait
+dotnet tool restore
+dotnet ef database update --project src/TinyFlags.Server -- --environment Development
+dotnet run --project src/TinyFlags.Server -- --environment Development
+```
+
+The compose database listens on localhost:54324, with local development credentials matching
+`appsettings.Development.json`. Its named volume persists across normal container stops.
+Integration tests use their own containers and never reset this database. Stop the development
+container with `docker compose down`; that preserves its volume. Outside Development, provide
+`ConnectionStrings__TinyFlags`. Server startup does not run migrations or expose business routes yet.
 
 ## Local package verification
 
