@@ -1,6 +1,6 @@
 # TinyFlags
 
-## Current feature: value synchronization - slice 6 implemented, awaiting review
+## Current feature: value synchronization - slice 6 approved
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
 The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
@@ -171,7 +171,7 @@ Follow-up: replaced the `result.Snapshot is not { } snapshot` pattern match in S
 a plain null check per the user's request, matching TinyDispatcher's "boring over impressive" style
 guide. 176 SDK tests passed. Committed as f37a736.
 
-### Synchronization slice 6: refresh and recovery - implemented, awaiting review
+### Synchronization slice 6: refresh and recovery - implemented, verified and approved
 
 Added TinyFlagsClientOptions.RefreshInterval (default 30s, validated like RetryDelay/MaxRetryDelay,
 included in CreateSnapshot/HasSameConfigurationAs). TinyFlagsSynchronizationWorker now loops after
@@ -208,7 +208,7 @@ caught this because the observable state (values preserved, task completes) was 
 this is a log-quality/intent fix, not a behavior fix.
 
 Full verification passed all 465 tests (117 generator, 181 SDK runtime, 167 server), with warnings
-treated as errors and no skips. Slice 6 remains uncommitted and awaits review.
+treated as errors and no skips. Approved by the instruction to commit; committed as e5858fd.
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 
