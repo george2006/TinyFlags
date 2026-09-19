@@ -48,12 +48,12 @@ static async Task RegisterWithServerAsync()
         options.MaxRetryDelay = TimeSpan.FromMilliseconds(100);
     });
     using var host = builder.Build();
-    await host.StartAsync();
     var flags = host.Services.GetRequiredService<CheckoutFeatureFlags>();
     var declaration = new Checkout();
-    Require(flags.Enabled == declaration.Enabled && flags.Label == declaration.Label, "Local defaults after startup");
+    Require(flags.Enabled == declaration.Enabled && flags.Label == declaration.Label, "Local defaults before startup");
     Require(!host.Services.GetRequiredService<HomeFeatureFlags>().Enabled, "Root assembly default");
     Require(!File.Exists(Path.Combine(AppContext.BaseDirectory, "TinyFlags.SourceGen.dll")), "Generator stays a compiler asset");
+    await host.StartAsync();
     Console.WriteLine("TINYFLAGS_HOST_STARTED");
     Require(await Console.In.ReadLineAsync() == "stop", "Explicit shutdown from integration test");
     await host.StopAsync();

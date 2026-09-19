@@ -155,6 +155,7 @@ public sealed partial class RegistrationWorkerTests
         await host.StartAsync();
 
         Assert.Empty(host.Services.GetServices<IHostedService>().OfType<TinyFlagsRegistrationWorker>());
+        Assert.Empty(host.Services.GetServices<IHostedService>().OfType<TinyFlagsSynchronizationWorker>());
         Assert.False(host.Services.GetRequiredService<StartupFeatureFlags>().Enabled);
         await host.StopAsync();
     }

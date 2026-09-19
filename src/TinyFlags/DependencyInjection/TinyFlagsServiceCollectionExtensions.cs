@@ -21,7 +21,7 @@ public static class TinyFlagsServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers local flag access and background registration with retries after host startup.
+    /// Registers local flag access, background registration and initial value synchronization after host startup.
     /// </summary>
     public static IServiceCollection AddTinyFlags(this IServiceCollection services, Action<TinyFlagsClientOptions> configure)
     {
@@ -46,6 +46,7 @@ public static class TinyFlagsServiceCollectionExtensions
                 provider.GetRequiredService<FeatureSnapshotReader>(), provider.GetRequiredService<ILogger<TinyFlagsApiClient>>()));
         }
         services.AddHostedService<TinyFlagsRegistrationWorker>();
+        services.AddHostedService<TinyFlagsSynchronizationWorker>();
         return services;
     }
 }

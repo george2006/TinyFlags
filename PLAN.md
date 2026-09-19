@@ -1,6 +1,6 @@
 # TinyFlags
 
-## Current feature: value synchronization - slice 4 approved
+## Current feature: value synchronization - slice 5 awaiting review
 
 Registration is complete; slices 8 and 9 were committed in b980cfc after 305 tests passed.
 The approved design in docs/value-synchronization-design.md defines components, ownership, conditional
@@ -142,6 +142,30 @@ Coverage includes reader validation, retry/disposal behavior, real HTTP byte lim
 timeouts and interrupted-body recovery, unchanged/stale/environment checks, and real PostgreSQL
 registration/read-only access. Approved by the user's instruction to commit and move on. Commit
 this slice and then implement slice 5: initial publication through the independent synchronization worker.
+
+### Synchronization slice 5: initial publication - implemented and verified, awaiting review
+
+Committed the approved client/refactor slice as 1aaf214. Added the agreed concrete
+TinyFlagsSynchronizationWorker with injected client, singleton FeatureValues, host lifetime and logger.
+It waits asynchronously for ApplicationStarted, independently fetches the initial snapshot, checks
+cancellation and publishes the complete values. The client continues to own retries and protocol
+translation. The worker logs classified failures without stopping the host or changing the store.
+No recurring polling is implemented in this slice.
+
+Configured AddTinyFlags registers the synchronization worker once alongside registration; local-only
+setup adds neither worker. Existing generated instances and explicitly supplied stores are preserved.
+Successful empty snapshots restore code-default fallback. Registration need not complete or succeed
+before synchronization. The synchronization worker is the SDK's only FeatureValues writer.
+
+Eleven focused real-HTTP/net8 host tests passed: startup independence, existing-instance updates,
+blocked registration, repeated configuration/single publication, empty snapshots, retained warm
+values on failures, transient recovery and shutdown before startup/during a streamed body. Two real
+API/PostgreSQL cases check read access independently of denied registration and preserve the store
+when reading is also denied. The packaged consumer now asserts declared defaults before startup;
+after startup an initial snapshot may legitimately replace them, so that old assertion would race.
+Full verification passed all 460 tests (117 generator/integration, 176 SDK runtime, 167 server),
+with warnings treated as errors and no skips, including the packaged consumer. git diff --check
+passed. Slice 5 remains uncommitted and awaits review.
 
 ## Completed refinement: retry operation ownership - implemented, verified and approved
 

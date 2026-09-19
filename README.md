@@ -10,9 +10,10 @@ Each assembly also gets a local registration catalog and contributes it automati
 its module initializes. The root application can compose these definitions through
 `TinyFlagsBootstrap`. `AddTinyFlags()` registers generated access classes from initialized
 assemblies using a shared local store. The runtime and generator pack into one NuGet package,
-verified with a separate local consumer. Configured clients register their definitions in a
-background worker after host startup, retrying transient failures. No package is published yet.
-The server exposes authenticated definition registration over HTTP.
+verified with a separate local consumer. Configured clients independently register definitions and
+load an initial server snapshot after host startup, retrying transient failures. Existing generated
+instances observe published values through the shared store. No package is published yet.
+The server exposes authenticated definition registration and conditional snapshot reads over HTTP.
 
 ```csharp
 using TinyFlags;
@@ -153,7 +154,8 @@ effect. Flags absent from a replacement return to their defaults; an empty snaps
 overrides. Values must be booleans or non-null strings, and keys must not be blank.
 
 Each read observes one complete snapshot. Multiple reads can observe different versions when
-an update occurs between them. The server exposes revisioned snapshots; SDK synchronization is future work.
+an update occurs between them. Configured hosts load an initial revisioned server snapshot after startup;
+recurring refresh is the next synchronization slice.
 
 ## Supported declarations
 
@@ -265,10 +267,11 @@ environment run in order; other environments use independent locks. Kind conflic
 Each environment now has a ValuesRevision. A batch inserting flags advances it once, atomically
 with those inserts; empty batches, replays, conflicts and failed writes do not advance it. Existing
 environments with definitions migrate to revision one; empty ones start at zero. This establishes
-the revision for the values endpoint and upcoming SDK synchronization worker.
+the revision for the values endpoint and SDK synchronization worker.
 The new GetFeatureValues vertical slice reads revision and typed values through TinyDispatcher
 in one Repeatable Read transaction. Matching revisions return an unchanged result without reading
-the flags; initial empty environments return a full empty snapshot. SDK synchronization is not implemented yet.
+the flags; initial empty environments return a full empty snapshot. The SDK loads one initial snapshot
+after host startup; recurring synchronization is not implemented yet.
 `POST /v1/client/definitions` exposes registration. The configured SDK registers in the background
 after host startup and retries transient failures until success, a permanent failure or shutdown.
 
@@ -405,11 +408,11 @@ builder.Services.AddTinyFlags(options =>
 ```
 
 Configuration is validated and copied during setup. Repeating equivalent configuration registers
-one worker; conflicting configuration is rejected. After ApplicationStarted, the worker composes
+one instance of each worker; conflicting configuration is rejected. After ApplicationStarted, the registration worker composes
 the initialized assemblies' catalog and sends one request at a time. DI setup and flag getters never contact
 the server. Shutdown cancels the startup wait or request; redirects are not followed. Failures are
-logged without stopping the host or changing local values. Background value synchronization is not
-enabled yet. Native .NET 8 host tests verify startup and shutdown; integration tests exercise the worker
+logged without stopping the host. The independent synchronization worker loads the first snapshot
+and retains local values if reading fails. Native .NET 8 host tests verify startup and shutdown; integration tests exercise registration
 against the actual registration server, authentication, dispatcher and PostgreSQL over Kestrel.
 
 The client uses TinyFlagsRetryPolicy for network failures, request timeouts, HTTP 408/429 and 5xx responses. Other
@@ -446,8 +449,16 @@ existing default-fallback behavior. The snapshot owns an immutable dictionary in
 HTTP response. FeatureSnapshot itself contains only data and internal conditional-request metadata.
 The reader does not impose registration's per-batch flag-count limit.
 
-This slice establishes a fetch operation. Publication and recurring refresh
-belong to the upcoming synchronization worker; configured applications still only register definitions.
+`TinyFlagsSynchronizationWorker` waits for ApplicationStarted and independently fetches one initial
+snapshot. It publishes the complete values through the existing singleton's ReplaceSnapshot method;
+already-created generated flag instances see the update on their next read. Empty revision-zero
+snapshots clear previous values and restore declared defaults. The parameterless AddTinyFlags remains
+local-only and registers neither worker.
+
+Registration can be blocked or denied while reading succeeds. Transient read failures retry inside
+the client; permanent or malformed initial responses end this read attempt without changing values
+or stopping the host. Shutdown cancels the startup wait, download or retry delay. This worker is the
+only SDK writer to FeatureValues. Recurring polling and later publication are the next slice.
 
 ## Local package verification
 
