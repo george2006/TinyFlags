@@ -1,9 +1,14 @@
+param([string]$RunDirectory)
+
 $ErrorActionPreference = 'Stop'
 
 $repository = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $runId = [Guid]::NewGuid().ToString('N')
 $version = "0.1.0-smoke.$runId"
-$runDirectory = Join-Path $repository "artifacts/package-tests/$runId"
+if ([string]::IsNullOrWhiteSpace($RunDirectory)) {
+    $RunDirectory = Join-Path $repository "artifacts/package-tests/$runId"
+}
+$runDirectory = [System.IO.Path]::GetFullPath($RunDirectory)
 $feed = Join-Path $runDirectory 'feed'
 $packages = Join-Path $runDirectory 'packages'
 $consumer = Join-Path $runDirectory 'consumer'

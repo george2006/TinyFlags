@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <DefineConstants Condition="'$(UpdatedDefaults)' == 'true'">$(DefineConstants);UPDATED_DEFAULTS</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="TinyFlags" Version="0.1.0-dev" />

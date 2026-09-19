@@ -14,6 +14,10 @@ public sealed class TinyFlagsClientOptions
 
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
+
     internal TinyFlagsClientOptions CreateSnapshot()
     {
         Validate();
@@ -21,12 +25,15 @@ public sealed class TinyFlagsClientOptions
         {
             Endpoint = new Uri(Endpoint!.AbsoluteUri.TrimEnd('/') + "/"),
             ApiKey = ApiKey,
-            RequestTimeout = RequestTimeout
+            RequestTimeout = RequestTimeout,
+            RetryDelay = RetryDelay,
+            MaxRetryDelay = MaxRetryDelay
         };
     }
 
     internal bool HasSameConfigurationAs(TinyFlagsClientOptions other)
-        => Endpoint == other.Endpoint && ApiKey == other.ApiKey && RequestTimeout == other.RequestTimeout;
+        => Endpoint == other.Endpoint && ApiKey == other.ApiKey && RequestTimeout == other.RequestTimeout
+            && RetryDelay == other.RetryDelay && MaxRetryDelay == other.MaxRetryDelay;
 
     internal void Validate()
     {
@@ -45,6 +52,16 @@ public sealed class TinyFlagsClientOptions
         if (RequestTimeout <= TimeSpan.Zero || RequestTimeout > TimeSpan.FromMilliseconds(int.MaxValue))
         {
             throw new ArgumentOutOfRangeException(nameof(RequestTimeout), "RequestTimeout must be positive and no greater than Int32.MaxValue milliseconds.");
+        }
+
+        if (RetryDelay < TimeSpan.FromMilliseconds(1) || RetryDelay > TimeSpan.FromMilliseconds(int.MaxValue))
+        {
+            throw new ArgumentOutOfRangeException(nameof(RetryDelay), "RetryDelay must be between one and Int32.MaxValue milliseconds.");
+        }
+
+        if (MaxRetryDelay < RetryDelay || MaxRetryDelay > TimeSpan.FromMilliseconds(int.MaxValue))
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxRetryDelay), "MaxRetryDelay must be at least RetryDelay and no greater than Int32.MaxValue milliseconds.");
         }
     }
 }

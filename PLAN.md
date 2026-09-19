@@ -523,6 +523,68 @@ installed .NET SDK 8.0.425 globally, including ASP.NET Core 8.0.31 needed by nat
 Approved by the user's instruction to commit and move on. Next slice adds retry classification
 and recovery using the agreed concrete TinyFlagsRetryPolicy, without Polly or custom interfaces.
 
+### Slice 8: retry and recovery - implemented and approved
+
+Slices 6 and 7 are committed in 3df0288. The user approved a concrete TinyFlagsRetryPolicy owning
+retry classification and delay calculation; the worker retains HTTP execution and cancellation.
+Value refresh remains a separate feature, with normal polling distinct from failed-request retries.
+
+Implemented policy: network failures, request timeouts, 408, 429 and 5xx retry; other responses and
+unexpected local exceptions stop. The worker snapshots the catalog once, reuses one HttpClient,
+awaits each request, disposes its response, and waits before the next attempt. Success is 204.
+RetryDelay defaults to one second, MaxRetryDelay to 30 seconds; equal jitter chooses between half
+and the full capped exponential ceiling, with a one-millisecond floor. Both options are validated,
+copied and checked when configuration repeats. Saturated attempt state prevents overflow.
+
+Valid Retry-After delta/date values on 429/503 impose a minimum delay, including beyond the normal
+cap. Malformed/expired headers retain backoff. Long waits are split into cancellable one-day
+segments to preserve the server minimum without exceeding Task.Delay's range. Shutdown cancels
+requests and waits; transient outages may retry indefinitely. No Polly, custom interface, new
+package dependency, value synchronization or additional endpoint was introduced.
+
+Verification: dotnet test TinyFlags.slnx --no-restore -warnaserror passed 304 tests
+(117 generator/integration, 95 SDK runtime, 92 server integration), with no skips.
+Coverage includes status classification, growing/jittered/capped backoff, long and malformed
+Retry-After, configuration validation, HTTP recovery with the same catalog, permanent failures,
+connection abort/timeout recovery, observed server minimum delay and shutdown after a retryable
+response with long backoff. Existing startup/default/shutdown behavior remains covered.
+A loopback proxy forwards to the actual Kestrel/auth/dispatcher/PostgreSQL API, drops the first
+response after commit, and verifies the worker retries successfully with no duplicate rows or
+changed creation timestamps. Package wiring/dependencies are unchanged; packaged HTTP verification
+remains the next approved feature-plan slice (9).
+
+Approved by the user's instruction to keep going and included in the requested commit with slice 9.
+
+### Slice 9: packaged end to end - implemented, verified and approved
+
+Reuse the existing package verification script, real PostgreSqlFixture, DatabaseSeed and
+TinyFlagsServerFactory. The new integration test packs a unique local NuGet version, restores
+a separate net8.0 host/library pair into an isolated package cache, checks local behavior and
+TFG002 diagnostics, then runs that built consumer as a separate process against Kestrel.
+
+The consumer's --register mode uses public AddTinyFlags configuration and generated access classes.
+It reports startup only after resolving defaults from both assemblies, then accepts an explicit
+stdin shutdown signal. Test-only endpoint/key configuration uses child environment variables,
+not process arguments. The package host uses the ASP.NET Core 8 shared framework for hosting.
+The PowerShell script accepts an optional run directory so build and process logs stay together.
+
+The test holds the environment row lock, proves consumer startup completes while registration
+is blocked, releases the lock and verifies all three definitions in the authenticated environment.
+It then rebuilds with changed boolean/string defaults plus a new flag, launches a second process,
+and verifies the original defaults/timestamps remain unchanged while the new definition is added.
+Only the packed TinyFlags dependency supplies runtime and analyzer assets to these consumers.
+No production changes or new test abstractions were needed for this slice.
+
+Focused packaged test passed, including package contents/dependencies, local consumer execution,
+expected TFG002, real HTTP registration and redeployment. Full solution verification then passed
+all 305 tests (117 generator/integration, 95 SDK runtime, 93 server integration), with warnings
+treated as errors and no skipped tests. The packaged scenario also passed within that full run.
+Build/consumer logs remain under artifacts/package-tests/cda9f864775b4dd091cf0fd42370a795.
+
+Approved by the user's instruction to commit and move on. Registration feature work is complete.
+Versioned value retrieval and synchronization need their own design and agreed slices before
+implementation.
+
 ## Completed slice: 0 - workspace bootstrap
 
 Requested: a new `TinyFlags` folder, solution, `src/`, and `tests/` under the shared repos folder.

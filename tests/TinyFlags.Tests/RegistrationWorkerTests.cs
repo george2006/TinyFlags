@@ -9,7 +9,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace TinyFlags.Tests;
 
-public sealed class RegistrationWorkerTests
+public sealed partial class RegistrationWorkerTests
 {
     [Fact]
     public async Task Host_starts_and_serves_generated_defaults_while_registration_is_blocked()
@@ -110,6 +110,8 @@ public sealed class RegistrationWorkerTests
     [InlineData("endpoint")]
     [InlineData("key")]
     [InlineData("timeout")]
+    [InlineData("retry")]
+    [InlineData("maxRetry")]
     public void Conflicting_configuration_is_rejected_without_changing_the_original_settings(string difference)
     {
         var builder = Host.CreateApplicationBuilder();
@@ -124,6 +126,8 @@ public sealed class RegistrationWorkerTests
             options.Endpoint = new Uri(difference == "endpoint" ? "https://other.example.com" : "https://flags.example.com/base/");
             options.ApiKey = difference == "key" ? "other-secret" : "original-secret";
             options.RequestTimeout = TimeSpan.FromSeconds(difference == "timeout" ? 10 : 30);
+            options.RetryDelay = TimeSpan.FromSeconds(difference == "retry" ? 2 : 1);
+            options.MaxRetryDelay = TimeSpan.FromSeconds(difference == "maxRetry" ? 60 : 30);
         }));
 
         Assert.DoesNotContain("original-secret", error.Message);
@@ -207,9 +211,14 @@ public sealed class RegistrationWorkerTests
     }
 
     [Theory]
+    [InlineData(400)]
     [InlineData(401)]
-    [InlineData(503)]
+    [InlineData(403)]
+    [InlineData(409)]
+    [InlineData(413)]
+    [InlineData(415)]
     [InlineData(302)]
+    [InlineData(200)]
     public async Task Failed_responses_complete_one_attempt_without_stopping_the_host_or_following_redirects(int status)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -237,14 +246,19 @@ public sealed class RegistrationWorkerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Network_failure_or_timeout_finishes_without_stopping_the_host(bool useTimeout)
+    public async Task Network_failure_or_timeout_recovers_without_stopping_the_host(bool useTimeout)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var requests = 0;
         await using var server = await StartServerAsync(async context =>
         {
-            Interlocked.Increment(ref requests);
+            var attempt = Interlocked.Increment(ref requests);
             using var body = await JsonDocument.ParseAsync(context.Request.Body);
+            if (attempt > 1)
+            {
+                context.Response.StatusCode = StatusCodes.Status204NoContent;
+                return;
+            }
             if (useTimeout)
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted);
@@ -259,13 +273,15 @@ public sealed class RegistrationWorkerTests
         {
             Configure(options, server);
             options.RequestTimeout = TimeSpan.FromSeconds(2);
+            options.RetryDelay = TimeSpan.FromMilliseconds(20);
+            options.MaxRetryDelay = TimeSpan.FromMilliseconds(40);
         });
         using var host = builder.Build();
 
         await host.StartAsync(timeout.Token);
         await GetWorker(host.Services).ExecuteTask!.WaitAsync(timeout.Token);
 
-        Assert.Equal(1, requests);
+        Assert.Equal(2, requests);
         Assert.False(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.IsCancellationRequested);
         Assert.False(host.Services.GetRequiredService<StartupFeatureFlags>().Enabled);
         await host.StopAsync(timeout.Token);

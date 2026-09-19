@@ -3,6 +3,23 @@ namespace TinyFlags.Tests;
 public sealed class TinyFlagsClientOptionsTests
 {
     [Theory]
+    [InlineData(0, 30000)]
+    [InlineData(-1, 30000)]
+    [InlineData(2147483648L, 2147483648L)]
+    [InlineData(1000, 999)]
+    [InlineData(1000, 2147483648L)]
+    public void Invalid_retry_settings_are_rejected_before_startup(long initial, long maximum)
+    {
+        var options = new TinyFlagsClientOptions
+        {
+            Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key",
+            RetryDelay = TimeSpan.FromMilliseconds(initial), MaxRetryDelay = TimeSpan.FromMilliseconds(maximum)
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => options.CreateSnapshot());
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("relative/path")]
     [InlineData("http://flags.example.com")]

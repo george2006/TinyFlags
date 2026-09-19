@@ -11,7 +11,7 @@ its module initializes. The root application can compose these definitions throu
 `TinyFlagsBootstrap`. `AddTinyFlags()` registers generated access classes from initialized
 assemblies using a shared local store. The runtime and generator pack into one NuGet package,
 verified with a separate local consumer. Configured clients register their definitions in a
-background worker after host startup. Retries are not implemented, and no package is published yet.
+background worker after host startup, retrying transient failures. No package is published yet.
 The server exposes authenticated definition registration over HTTP.
 
 ```csharp
@@ -238,8 +238,10 @@ cache reuse and invalidation, including external constants and partial declarati
 The generator tests invoke Roslyn directly. A separate package verification script tests
 automatic generator inclusion through ordinary PackageReference consumers.
 
-The full solution also includes server integration tests and requires .NET 10 SDK, .NET 8 and ASP.NET Core 8 runtimes,
-and a running Docker engine with Linux containers:
+The full solution also includes server integration tests and requires .NET 10 SDK, .NET 8 and
+ASP.NET Core 8 runtimes, PowerShell (Windows PowerShell on Windows or pwsh elsewhere), NuGet access,
+and a running Docker engine with Linux containers. The packaged integration test builds an isolated
+consumer through the package script as part of the suite:
 
 ```shell
 dotnet test TinyFlags.slnx -warnaserror
@@ -260,8 +262,8 @@ are rejected before writing. Each nonempty registration locks its environment ro
 Read Committed transaction before reading definitions. Concurrent registrations for that
 environment run in order; other environments use independent locks. Kind conflicts raise
 `FeatureKindConflictException` with all conflicting keys and leave the entire batch unwritten.
-`POST /v1/client/definitions` exposes registration. The configured SDK sends one background
-attempt after host startup; retry and recovery follow in the next slice.
+`POST /v1/client/definitions` exposes registration. The configured SDK registers in the background
+after host startup and retries transient failures until success, a permanent failure or shutdown.
 
 Client authentication is implemented in `Authentication/`. `ClientApiKey.Issue` returns a random
 256-bit secret separately from the entity; PostgreSQL stores only its SHA-256 hash. Requests use
@@ -377,11 +379,20 @@ builder.Services.AddTinyFlags(options =>
 
 Configuration is validated and copied during setup. Repeating equivalent configuration registers
 one worker; conflicting configuration is rejected. After ApplicationStarted, the worker composes
-the initialized assemblies' catalog and sends one request. DI setup and flag getters never contact
+the initialized assemblies' catalog and sends one request at a time. DI setup and flag getters never contact
 the server. Shutdown cancels the startup wait or request; redirects are not followed. Failures are
-logged without stopping the host or changing local values. There are no retries or value downloads
+logged without stopping the host or changing local values. Value downloads are not implemented
 yet. Native .NET 8 host tests verify startup and shutdown; integration tests exercise the worker
 against the actual registration server, authentication, dispatcher and PostgreSQL over Kestrel.
+
+The worker retries network failures, request timeouts, HTTP 408/429 and 5xx responses. Other
+responses stop registration; 204 completes it. RetryDelay defaults to 1 second and MaxRetryDelay
+to 30 seconds. The exponential backoff uses jitter between half and the full capped delay, with
+a minimum of 1 millisecond. Both settings are validated and included in configuration snapshots.
+Valid Retry-After values on 429/503 can extend the wait beyond the normal cap; malformed or expired
+values retain ordinary backoff. Long waits remain cancellable. The same catalog is retried, with
+no fixed attempt limit, and responses are disposed before waiting. The concrete TinyFlagsRetryPolicy
+calculates retry decisions; the worker owns calls and waits. There is no Polly dependency.
 
 ## Local package verification
 
@@ -408,5 +419,12 @@ consumer checks defaults, automatic DI across initialized assemblies, shared upd
 catalog composition. The generator DLL must not be copied to the application's runtime output.
 Artifacts and the expected failing build log remain under `artifacts/package-tests`.
 The script needs NuGet access for Microsoft.Extensions dependencies and does not publish packages.
+
+The server integration suite also launches this packed net8.0 consumer as a separate process
+against the real API and Docker PostgreSQL. It verifies startup with registration blocked at the
+database, multi-assembly definitions, and redeployment with changed defaults plus a new flag.
+Existing definitions retain their defaults and timestamps. Package, build and consumer process
+logs remain together under the test's unique artifacts directory. The smoke script's optional
+`-RunDirectory` parameter selects that directory for integration-test orchestration.
 
 See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).
