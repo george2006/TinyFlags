@@ -59,6 +59,11 @@ catalog ordering contract.
 
 See [Diagnostics](diagnostics.md) for every `TFG0xx` code with examples.
 
+Because identity is just this string, two independent services that declare the same namespace,
+class, and property name end up sharing one flag with no configuration at all. See
+[Sharing a Flag Across Services](multi-service-flags.md) for why that works and how to do it on
+purpose.
+
 ## Runtime components
 
 Local-only (always present):
