@@ -26,5 +26,6 @@ Core docs:
 - [Value Synchronization](value-synchronization.md)
 - [Sharing a Flag Across Services](multi-service-flags.md)
 - [Running the Server](server.md)
+- [Admin Dashboard](admin-dashboard.md)
 - [Diagnostics](diagnostics.md)
 - [Tiny suite](tiny-suite.md)

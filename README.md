@@ -113,6 +113,7 @@ and authentication.
 - [Value Synchronization](docs/value-synchronization.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Running the Server](docs/server.md)
+- [Admin Dashboard](docs/admin-dashboard.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Tiny suite](docs/tiny-suite.md)
 
