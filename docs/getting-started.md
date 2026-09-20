@@ -33,6 +33,10 @@ Only `bool` and non-nullable `string` properties with constant defaults become f
 [Architecture](architecture.md#supported-declarations) for the complete shape rules and every
 `TFG0xx` diagnostic.
 
+Want the same flag read by more than one service? Declare the identical provider — same
+namespace, class, and property name — in each one; no shared library or server configuration
+needed. See [Sharing a Flag Across Services](multi-service-flags.md).
+
 The generator produces a public sealed access class next to your declaration:
 `MyApp.CheckoutFeatureFlags`, constructed with `FeatureValues`.
 

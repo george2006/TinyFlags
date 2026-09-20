@@ -111,6 +111,7 @@ and authentication.
 - [Architecture](docs/architecture.md)
 - [Registration](docs/registration.md)
 - [Value Synchronization](docs/value-synchronization.md)
+- [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Running the Server](docs/server.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Tiny suite](docs/tiny-suite.md)
