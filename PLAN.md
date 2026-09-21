@@ -941,6 +941,15 @@ without fixing how you get a scoped key doesn't solve the usability problem.
   what this product needs. Still a hashed bearer secret, still no passwords, no user accounts, no
   ASP.NET Core Identity — additive to the existing model, not a replacement.
 
+**Login UX for a scoped key — unchanged.** `/Admin/Login` stays exactly as it is today: one
+"Admin token" field, no project picker. The token itself already encodes the scope, so there's
+nothing extra to ask at login. What changes is invisible at login time: on success, the auth
+cookie gets a `ProjectId` claim baked into the ticket, mirroring how
+`ClientApiKeyAuthenticationHandler` already puts `EnvironmentClaim`/`ProjectClaim` on *client* key
+tickets — admin tickets carry no scope claim today, so this is the same pattern applied there too.
+Every subsequent page enforces the claim server-side (query filtering), not just in the UI — a
+crafted URL pointing at another project's environment returns nothing, it isn't merely hidden.
+
 **Known remaining gap, explicitly out of scope for this fix.** This still identifies a *key*, not
 a *person* — no per-person identity, no real "who clicked this" audit trail, just which token was
 used. That is the same territory as the earlier OIDC/SaaS conversation and is a separate, larger
