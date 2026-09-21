@@ -975,3 +975,43 @@ happens if it's lost. Answer, using what already exists today:
 
 Nothing to build here. Worth a line in `docs/admin-dashboard.md` about the "mint yourself a
 personal token, don't rely on the bootstrap one" practice when the scoping slice above is done.
+
+Note (2026-09-21, later the same session): `TinyFlags.Server` has since moved to its own private
+repo. The admin-auth-scoping and licensing sections above now describe work that lives there, not
+here — carried forward verbatim into that repo's own `PLAN.md`. Left in place here too, as
+historical record of when and why the decision was made; not re-litigated or removed.
+
+## Open item: repo history before going public (target: end of this week)
+
+This repo (`TinyFlags`, the client) is currently **private**. The plan is to flip it public around
+the end of the week, once the client + protocol are ready to stand on their own without the server
+source sitting behind them.
+
+**What "before flipping to public" needs deciding, raised 2026-09-21:** commit history still
+contains `TinyFlags.Server`'s source from before the split (`git rm` removed it from the current
+tree, not from history). Two things to know before that day:
+
+- Rewriting `main`'s history (`git filter-branch`, stripping the server-only paths from every
+  commit) is possible and was scoped out this session, but **does not fully solve the problem on
+  its own** — GitHub keeps every merged PR's original commits alive via internal refs
+  (`refs/pull/N/head`) regardless of what happens to `main`. Several already-merged PRs here
+  touched `TinyFlags.Server` directly (admin dashboard, update-values-endpoint, admin dashboard
+  redesign, api-key-generation, the TinyValidations integration, the samples/quality-pass work)
+  and their "Files changed" tabs will keep showing that server source forever, independent of any
+  history rewrite — merged PRs aren't something you can delete through the normal GitHub UI.
+- Decided this session: not worth fighting hard for. No real secret-sauce IP in
+  `TinyFlags.Server` — it's "elegant CRUD," per the user's own words — and the actual thing being
+  protected is the licensed product/implementation, not the code's secrecy. The protocol being
+  public and reproducible by anyone is *intentional*, not a leak (see
+  `docs/protocol.md`) — "I do not care of people implementing their own endpoints."
+
+**Before the end-of-week flip, explicitly decide (don't default silently):**
+
+1. Rewrite `main`'s history anyway, purely for tidiness (still won't hide the PRs) — yes/no.
+2. Leave the old PRs showing server source as a known, accepted tradeoff — most likely answer,
+   given the reasoning above, but say so explicitly rather than assuming.
+3. Anything else surface between now and then that changes the calculus (e.g., if
+   `TinyFlags.Server` gains real proprietary logic worth protecting by then, revisit).
+
+No code or history changes needed today. This is a decision checklist for whoever picks this back
+up right before flipping visibility, not an in-progress task.
