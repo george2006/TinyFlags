@@ -7,7 +7,8 @@ different language entirely, a thin layer in front of an existing feature-flag s
 that contract, written for someone implementing a server rather than someone using the SDK.
 
 `TinyFlags.Server` is the reference implementation, not a requirement — see
-[Running the Server](server.md) if you'd rather deploy it than write your own.
+[TinyFlags.Server](https://github.com/george2006/TinyFlags.Server) if you'd rather deploy it than
+write your own.
 
 ## Endpoints
 
@@ -162,4 +163,5 @@ running on its last known values until the server recovers.
   specific limits and concurrency behavior
 - [Value Synchronization](value-synchronization.md) — the SDK-side polling worker and its failure
   handling
-- [Running the Server](server.md) — deploying `TinyFlags.Server` itself
+- [TinyFlags.Server](https://github.com/george2006/TinyFlags.Server) — deploying the reference
+  implementation itself

@@ -84,7 +84,8 @@ Added when `AddTinyFlags` is configured with server options:
 | `TinyFlagsRegistrationWorker` | Sends the composed catalog to the server after startup |
 | `TinyFlagsSynchronizationWorker` | Fetches and republishes values after startup, then on a recurring interval — the SDK's only writer to `FeatureValues` |
 
-Server (`TinyFlags.Server`, see [Running the Server](server.md)):
+Server (`TinyFlags.Server` — a separate, privately-hosted reference implementation; this is its
+conceptual shape, not something you need access to it to understand):
 
 | Component | Responsibility |
 | --- | --- |

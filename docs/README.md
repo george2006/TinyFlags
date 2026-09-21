@@ -5,7 +5,9 @@ If you only read one thing first, start with **Getting Started** and then skim *
 Key capabilities (high level):
 
 - compile-time typed flags, generated from `IFeatureProvider` declarations
-- local-only mode (`FeatureValues`) or server-synced mode (`TinyFlags.Server`)
+- local-only mode (`FeatureValues`) or server-synced mode, against `TinyFlags.Server` (a
+  separate, privately-hosted repo) or your own server speaking the same
+  [wire protocol](protocol.md)
 - revisioned values with conditional GET (`ETag`) and jittered recurring refresh
 - background registration and synchronization workers, independent of each other
 - authenticated, environment-scoped HTTP with separate register/read permissions
@@ -15,8 +17,8 @@ Key capabilities (high level):
 ## Status
 
 `0.1.0-dev`. Not yet published to NuGet.org; pack and reference it locally (see the top-level
-[README](../README.md#install)). `TinyFlags.Server` targets net10.0; the NuGet client targets
-net8.0 so applications can use the same package before and after upgrading.
+[README](../README.md#install)). The NuGet client targets net8.0 so applications can use the same
+package before and after upgrading to whatever the server targets.
 
 Core docs:
 
@@ -24,8 +26,7 @@ Core docs:
 - [Architecture](architecture.md)
 - [Registration](registration.md)
 - [Value Synchronization](value-synchronization.md)
+- [Server Protocol](protocol.md)
 - [Sharing a Flag Across Services](multi-service-flags.md)
-- [Running the Server](server.md)
-- [Admin Dashboard](admin-dashboard.md)
 - [Diagnostics](diagnostics.md)
 - [Tiny suite](tiny-suite.md)
