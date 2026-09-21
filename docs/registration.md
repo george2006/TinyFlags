@@ -72,10 +72,10 @@ conflicting keys.
 `ClientApiKey.Issue` returns a random 256-bit secret once; PostgreSQL stores only its SHA-256
 hash. Each key identifies one environment and its project, with three independent grants:
 `definitions:register`, `values:read` (see [Value Synchronization](value-synchronization.md)), and
-`values:write`. Granting `values:write` without `values:read` is rejected at issuance — there is
-no write-without-read combination. No endpoint checks `values:write` yet; it exists on keys ahead
-of the update endpoint that will require it. Revocation is checked on every new request; a request
-already authenticated is allowed to finish. Multiple keys can coexist during rotation. See
+`values:write` (required by `PATCH /v1/client/values` — see the [Server Protocol](protocol.md)).
+Granting `values:write` without `values:read` is rejected at issuance — there is no
+write-without-read combination. Revocation is checked on every new request; a request already
+authenticated is allowed to finish. Multiple keys can coexist during rotation. See
 [Running the Server](server.md#issuing-keys) for how to issue a key from the command line.
 
 ## Concurrency and consistency
