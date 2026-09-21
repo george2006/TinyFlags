@@ -24,29 +24,42 @@ internal static class FeatureCatalogAnalyzer
 
     private static ISymbol? FindNameConflict(INamespaceSymbol assemblyNamespace)
     {
-        var currentNamespace = assemblyNamespace;
-        foreach (var name in new[] { "TinyFlags", "Generated", "ThisAssemblyFeatureCatalog" })
+        var tinyFlagsType = FindTypeMember(assemblyNamespace, "TinyFlags");
+        if (tinyFlagsType is not null)
         {
-            var type = currentNamespace.GetTypeMembers(name, arity: 0).FirstOrDefault();
-            if (type is not null)
-            {
-                return type;
-            }
-
-            var child = currentNamespace.GetNamespaceMembers().FirstOrDefault(member => member.Name == name);
-            if (child is null)
-            {
-                return null;
-            }
-
-            if (name == "ThisAssemblyFeatureCatalog")
-            {
-                return child;
-            }
-
-            currentNamespace = child;
+            return tinyFlagsType;
         }
 
-        return null;
+        var tinyFlagsNamespace = FindNamespaceMember(assemblyNamespace, "TinyFlags");
+        if (tinyFlagsNamespace is null)
+        {
+            return null;
+        }
+
+        var generatedType = FindTypeMember(tinyFlagsNamespace, "Generated");
+        if (generatedType is not null)
+        {
+            return generatedType;
+        }
+
+        var generatedNamespace = FindNamespaceMember(tinyFlagsNamespace, "Generated");
+        if (generatedNamespace is null)
+        {
+            return null;
+        }
+
+        var catalogType = FindTypeMember(generatedNamespace, "ThisAssemblyFeatureCatalog");
+        if (catalogType is not null)
+        {
+            return catalogType;
+        }
+
+        return FindNamespaceMember(generatedNamespace, "ThisAssemblyFeatureCatalog");
     }
+
+    private static INamedTypeSymbol? FindTypeMember(INamespaceSymbol containingNamespace, string name)
+        => containingNamespace.GetTypeMembers(name, arity: 0).FirstOrDefault();
+
+    private static INamespaceSymbol? FindNamespaceMember(INamespaceSymbol containingNamespace, string name)
+        => containingNamespace.GetNamespaceMembers().FirstOrDefault(member => member.Name == name);
 }
