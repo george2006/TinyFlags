@@ -34,7 +34,7 @@ Only `bool` and non-nullable `string` properties with constant defaults become f
 `TFG0xx` diagnostic.
 
 Want the same flag read by more than one service? Declare the identical provider — same
-namespace, class, and property name — in each one; no shared library or server configuration
+namespace, class, and property name — in each one. No shared library or server configuration
 needed. See [Sharing a Flag Across Services](multi-service-flags.md).
 
 The generator produces a public sealed access class next to your declaration:
@@ -53,7 +53,7 @@ services.AddTinyFlags();
 ```
 
 This registers a shared `FeatureValues` singleton and every generated access class from
-initialized assemblies. No network calls happen anywhere in this mode; flags read their declared
+initialized assemblies. No network calls happen anywhere in this mode. Flags read their declared
 defaults unless something else calls `FeatureValues.ReplaceSnapshot` directly.
 
 ### Option B: Connect to a server
@@ -87,9 +87,9 @@ bool enabled = flags.NuevoCheckout;
 string label = flags.TextoBoton;
 ```
 
-Each read consults the current snapshot. In local-only mode that is always the declared default;
-in server-synced mode it is whatever the synchronization worker last published — the same
-generated instance observes updates automatically, no re-resolution needed.
+Each read consults the current snapshot. In local-only mode that's always the declared default. In
+server-synced mode it's whatever the synchronization worker last published — the same generated
+instance observes updates automatically. No re-resolution needed.
 
 ## 5) Run the server
 
