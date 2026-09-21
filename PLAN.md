@@ -903,3 +903,49 @@ continues without waiting for network I/O. The worker owns server registration, 
 and retries. Reads use declared defaults until a successful initial snapshot arrives; subsequent
 failures retain the last known values. Design the signaling mechanism in that future feature;
 do not introduce it into the current DI slice.
+
+## Open problem: admin auth has no scope (not yet slice-planned)
+
+Raised 2026-09-21, end of the design-pass/samples/docs-style session. Not started; this is intent
+for a future feature, not an agreed slice breakdown yet.
+
+**The problem.** `AdminApiKey` has no scope. Every admin token reaches every project on the
+server — there is no way to hand someone access to just their own team's flags. The user called
+this a real code smell, not a nitpick, and specifically for a self-hosted product: TinyFlags.Server
+already supports multiple projects/environments in one database, but the admin trust model is
+flat, so the data model and the trust model disagree with each other.
+
+**First proposal and why it was wrong.** Scope `AdminApiKey` to a `ProjectId`, issued via a new
+`--issue-admin-key --project <guid>` CLI flag. The user rejected this, correctly: as described, it
+still required shell/`docker exec` access to grant a team lead their own scoped key, which is not
+an acceptable normal workflow for a self-hosted admin tool. Requiring a terminal for *every*
+delegation, not just the very first bootstrap key, was the actual smell — scoping the blast radius
+without fixing how you get a scoped key doesn't solve the usability problem.
+
+**Corrected direction, agreed in discussion, not yet slice-planned.**
+
+- `AdminApiKey` gets a nullable `ProjectId`. Null = global admin (today's behavior, unchanged).
+  Non-null = scoped to that one project's environments, flags, and client keys.
+- `--issue-admin-key` keeps its CLI form *only* for the very first admin key on a fresh install —
+  the unavoidable bootstrap case shared by every self-hosted tool (Grafana, Gitea, etc. all have
+  some form of this: no admin exists yet, so nothing but shell access can create one).
+- Every key after that — including a team lead's project-scoped key — must be issuable from
+  `/Admin/Tokens` in the browser, not the CLI. That page already lets an existing admin issue more
+  admin tokens; it needs a project-scope picker added to its issue form, the same shape
+  `/Admin/Keys` already uses to pick an environment for a client key.
+- Every dashboard query scopes by the calling key's `ProjectId` when it is non-null. A
+  project-scoped key can issue further keys, but never scoped broader than its own — it can't
+  mint itself a global key.
+- Deliberately still not RBAC: one scope dimension (project), not permission tiers
+  (read-only/read-write admin), which the user already ruled out earlier as unnecessary weight for
+  what this product needs. Still a hashed bearer secret, still no passwords, no user accounts, no
+  ASP.NET Core Identity — additive to the existing model, not a replacement.
+
+**Known remaining gap, explicitly out of scope for this fix.** This still identifies a *key*, not
+a *person* — no per-person identity, no real "who clicked this" audit trail, just which token was
+used. That is the same territory as the earlier OIDC/SaaS conversation and is a separate, larger
+conversation, not something to fold into this fix.
+
+**Next session:** turn the corrected direction above into an actual slice breakdown (data model
+change, CLI bootstrap-only restriction, `/Admin/Tokens` UI change, query scoping) before writing
+any code, per the working agreement.
