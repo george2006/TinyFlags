@@ -17,8 +17,7 @@ internal static class FeatureCatalogAnalyzer
         }
 
         var location = conflict.Locations.First(candidate => candidate.IsInSource);
-        var treeIndex = compilation.SyntaxTrees.TakeWhile(tree => tree != location.SourceTree).Count();
-        var source = new SourceLocation(treeIndex, location.SourceSpan.Start, location.SourceSpan.Length);
+        var source = SourceLocationReader.Read(compilation, location);
 
         return new FeatureIssue("TFG005", conflict.Name, source);
     }

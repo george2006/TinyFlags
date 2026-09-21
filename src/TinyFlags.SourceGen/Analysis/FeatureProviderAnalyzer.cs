@@ -174,8 +174,5 @@ internal sealed class FeatureProviderAnalyzer
     }
 
     private static SourceLocation ReadLocation(Compilation compilation, Location location)
-    {
-        var treeIndex = compilation.SyntaxTrees.TakeWhile(tree => tree != location.SourceTree).Count();
-        return new SourceLocation(treeIndex, location.SourceSpan.Start, location.SourceSpan.Length);
-    }
+        => SourceLocationReader.Read(compilation, location);
 }
