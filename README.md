@@ -113,6 +113,7 @@ and authentication.
 - [Value Synchronization](docs/value-synchronization.md)
 - [Server Protocol](docs/protocol.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
+- [Multi-Service Sample](samples/MultiService/README.md) — a runnable walkthrough, two services and a Dockerized server
 - [Running the Server](docs/server.md)
 - [Admin Dashboard](docs/admin-dashboard.md)
 - [Diagnostics](docs/diagnostics.md)
