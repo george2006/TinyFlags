@@ -59,3 +59,9 @@ package both services already reference and document that it is a shared flag â€
 class, a line in your own onboarding docs, whatever your team already uses for cross-service
 contracts. TinyFlags does not need that reference to exist for sharing to work; it only helps
 people, not the generator.
+
+## Try it
+
+[`samples/MultiService`](../samples/MultiService/README.md) runs two independent services against
+a Dockerized `TinyFlags.Server`, each with its own private flag plus one identical, shared
+declaration â€” flip the shared value in the admin dashboard and watch both terminals pick it up.

@@ -1,0 +1,92 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    environment:
+      POSTGRES_DB: tinyflags
+      POSTGRES_USER: tinyflags
+      POSTGRES_PASSWORD: tinyflags-sample
+    ports:
+      - "127.0.0.1:54326:5432"
+    volumes:
+      - tinyflags-sample-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinyflags -d tinyflags"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  # TinyFlags clients require HTTPS or a loopback endpoint — a deliberate guard against leaking an
+  # API key over plain HTTP to a non-local host. orders-service and payments-service below share
+  # this container's network namespace so "http://localhost" is genuinely correct for them, not a
+  # bypass of that check. Their ports are declared here for the same reason.
+  tinyflags-server:
+    build:
+      context: ../../src/TinyFlags.Server
+    image: tinyflags-server-sample
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+    ports:
+      - "127.0.0.1:8085:8080" # TinyFlags.Server itself / the admin dashboard
+      - "127.0.0.1:8090:8081" # orders-service
+      - "127.0.0.1:8091:8082" # payments-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-shot: migrates the database, creates a project/environment/client key, and issues an
+  # admin token — writing the two secrets to a shared volume instead of a console you'd copy from.
+  # Runs once per `docker compose up`, then exits; orders-service and payments-service wait for it.
+  bootstrap:
+    image: tinyflags-server-sample
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+    volumes:
+      - tinyflags-sample-keys:/keys
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      # Both commands log EF Core activity to stdout alongside the secret they print last, so
+      # keep only the final line — the secret — not the whole console transcript. The client key
+      # only needs to reach the other two containers; the admin key is also `tee`'d back to this
+      # container's own stdout, since a human needs to read it (`docker compose logs bootstrap`).
+      - "dotnet TinyFlags.Server.dll --migrate && dotnet TinyFlags.Server.dll --environment Development --seed-development | tail -n 1 > /keys/client.key && dotnet TinyFlags.Server.dll --environment Development --issue-admin-key --label Sample | tail -n 1 | tee /keys/admin.key"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  orders-service:
+    build:
+      context: ../../.
+      dockerfile: samples/MultiService/OrdersService/Dockerfile
+    network_mode: "service:tinyflags-server"
+    environment:
+      ASPNETCORE_URLS: "http://+:8081"
+      TinyFlags__Endpoint: "http://localhost:8080"
+    volumes:
+      - tinyflags-sample-keys:/keys:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      tinyflags-server:
+        condition: service_started
+
+  payments-service:
+    build:
+      context: ../../.
+      dockerfile: samples/MultiService/PaymentsService/Dockerfile
+    network_mode: "service:tinyflags-server"
+    environment:
+      ASPNETCORE_URLS: "http://+:8082"
+      TinyFlags__Endpoint: "http://localhost:8080"
+    volumes:
+      - tinyflags-sample-keys:/keys:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      tinyflags-server:
+        condition: service_started
+
+volumes:
+  tinyflags-sample-db:
+  tinyflags-sample-keys:
