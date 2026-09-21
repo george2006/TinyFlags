@@ -949,3 +949,20 @@ conversation, not something to fold into this fix.
 **Next session:** turn the corrected direction above into an actual slice breakdown (data model
 change, CLI bootstrap-only restriction, `/Admin/Tokens` UI change, query scoping) before writing
 any code, per the working agreement.
+
+**Token lifecycle and loss recovery — already solved by existing behavior, no new design needed.**
+The user asked whether the admin keeps the bootstrap token forever, requests a new one, or what
+happens if it's lost. Answer, using what already exists today:
+
+- The bootstrap token isn't meant to be permanent. Right after minting it via shell, log in once
+  and use `/Admin/Tokens` to issue a second, properly-labeled personal key, store that in a
+  password manager, and optionally revoke the raw bootstrap one.
+- Losing *a* token, while at least one other still works: log in with the working one, revoke the
+  lost one, issue a new one. Already supported — `/Admin/Tokens` allows multiple coexisting admin
+  keys, each independently revocable, exactly for this.
+- Losing *every* token at once: back to shell/`docker exec` + `--issue-admin-key`, same as day 1.
+  Not a gap to design around — whoever has infra access to the container can always regain
+  control; if they don't, that's an infra-permissions problem, not a TinyFlags one.
+
+Nothing to build here. Worth a line in `docs/admin-dashboard.md` about the "mint yourself a
+personal token, don't rely on the bootstrap one" practice when the scoping slice above is done.
