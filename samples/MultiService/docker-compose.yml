@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    environment:
+      POSTGRES_DB: tinyflags
+      POSTGRES_USER: tinyflags
+      POSTGRES_PASSWORD: tinyflags-sample
+    ports:
+      - "127.0.0.1:54326:5432"
+    volumes:
+      - tinyflags-sample-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinyflags -d tinyflags"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  tinyflags-server:
+    build:
+      context: ../../src/TinyFlags.Server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+    ports:
+      - "127.0.0.1:8085:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  tinyflags-sample-db:
