@@ -14,23 +14,32 @@ var enabled = FeatureDefinition.Boolean("MyApp.Checkout.NuevoCheckout", false);
 var label = FeatureDefinition.String("MyApp.Checkout.TextoBoton", "Comprar");
 ```
 
-The generator exposes an internal, sorted, deduplicated catalog per assembly
-(`TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions`), populated without executing any
-declaration constructor or getter. A generated module initializer registers that catalog with
-`TinyFlagsBootstrap`; the host composes every initialized assembly's contribution through
-`TinyFlagsBootstrap.GetDefinitions()`. See [Architecture](architecture.md#generator-pipeline) for
-how composition and conflict detection work.
+The generator exposes an internal, sorted, deduplicated catalog per assembly:
+`TinyFlags.Generated.ThisAssemblyFeatureCatalog.Definitions`. It's populated without executing any
+declaration constructor or getter.
+
+A generated module initializer registers that catalog with `TinyFlagsBootstrap`. The host composes
+every initialized assembly's contribution through `TinyFlagsBootstrap.GetDefinitions()`.
+
+See [Architecture](architecture.md#generator-pipeline) for how composition and conflict detection
+work.
 
 ## What the registration worker does
 
-When `AddTinyFlags` is configured with server options, `TinyFlagsRegistrationWorker` waits for
-`ApplicationStarted`, composes the catalog, and calls `TinyFlagsApiClient.RegisterDefinitionsAsync`
-— once per host, independent of value synchronization. Transient failures (network errors,
-timeouts, 408/429/5xx) retry with backoff through `TinyFlagsRetryPolicy`, honoring `Retry-After` on
-429/503. A permanent failure (rejected credentials, denied access, a definitions conflict, or a
-rejected request) stops this worker; the host keeps running and local flag values remain whatever
-they already were. Registration never touches `FeatureValues` — only
-[the synchronization worker does](value-synchronization.md).
+`TinyFlagsRegistrationWorker` runs once per host, after `ApplicationStarted`:
+
+1. Composes the catalog from every initialized assembly.
+2. Calls `TinyFlagsApiClient.RegisterDefinitionsAsync`.
+
+**Transient failures** — network errors, timeouts, 408/429/5xx — retry with backoff through
+`TinyFlagsRetryPolicy`, honoring `Retry-After` on 429/503.
+
+**Permanent failures** — rejected credentials, denied access, a definitions conflict, a rejected
+request — stop the worker. The host keeps running; local flag values stay whatever they already
+were.
+
+Registration never touches `FeatureValues` — only
+[the synchronization worker](value-synchronization.md) does.
 
 ## HTTP contract
 
@@ -69,20 +78,30 @@ conflicting keys.
 
 ## Authentication and permissions
 
-`ClientApiKey.Issue` returns a random 256-bit secret once; PostgreSQL stores only its SHA-256
-hash. Each key identifies one environment and its project, with three independent grants:
-`definitions:register`, `values:read` (see [Value Synchronization](value-synchronization.md)), and
-`values:write` (required by `PATCH /v1/client/values` — see the [Server Protocol](protocol.md)).
-Granting `values:write` without `values:read` is rejected at issuance — there is no
-write-without-read combination. Revocation is checked on every new request; a request already
-authenticated is allowed to finish. Multiple keys can coexist during rotation. See
-[Running the Server](server.md#issuing-keys) for how to issue a key from the command line.
+`ClientApiKey.Issue` returns a random 256-bit secret once. PostgreSQL stores only its SHA-256
+hash — never the secret itself.
+
+Each key identifies one environment and one project, with three independent grants:
+
+- `definitions:register`
+- `values:read` — see [Value Synchronization](value-synchronization.md)
+- `values:write` — required by `PATCH /v1/client/values`, see the [Server Protocol](protocol.md)
+
+`values:write` without `values:read` is rejected at issuance; there is no write-without-read
+combination.
+
+Revocation is checked on every new request — a request already authenticated is allowed to finish.
+Multiple keys can coexist during rotation.
+
+See [Running the Server](server.md#issuing-keys) to issue a key from the command line.
 
 ## Concurrency and consistency
 
 Each nonempty registration locks its environment row inside a Read Committed transaction before
-reading current definitions, so concurrent registrations for the same environment apply in order;
-other environments use independent locks and are unaffected. A batch that inserts one or more new
-flags advances the environment's `ValuesRevision` exactly once, atomically with those inserts.
-Empty batches, pure replays, conflicts, and failed writes never advance it — that revision is what
+reading current definitions. Concurrent registrations for the same environment apply in order;
+other environments use independent locks and are unaffected.
+
+A batch that inserts one or more new flags advances the environment's `ValuesRevision` exactly
+once, atomically with those inserts. Empty batches, pure replays, conflicts, and failed writes
+never advance it — that revision is what
 [value synchronization](value-synchronization.md) uses to know whether anything changed.

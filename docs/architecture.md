@@ -32,9 +32,9 @@ Partial declarations are combined into one provider and contribute once.
 
 Each assembly also gets a generated module initializer that registers its local catalog with
 `TinyFlagsBootstrap` on load. The root application composes every initialized assembly's
-contribution through `TinyFlagsBootstrap.GetDefinitions()`; equivalent keys with the same kind and
-default appear once, and conflicting kinds or defaults throw during composition. The bootstrap
-never scans or loads assemblies itself — only initialized ones contribute.
+contribution through `TinyFlagsBootstrap.GetDefinitions()`. Equivalent keys with the same kind and
+default appear once; conflicting kinds or defaults throw during composition. The bootstrap never
+scans or loads assemblies itself — only initialized ones contribute.
 
 ## Supported declarations
 
@@ -52,9 +52,9 @@ never scans or loads assemblies itself — only initialized ones contribute.
 
 Neither constructors nor getters are ever executed to discover defaults. Classes without the
 marker are ignored. A provider with an invalid property produces a diagnostic and contributes no
-partial definition; an otherwise-empty provider contributes no flags. Flag identity is the fully
+partial definition. An otherwise-empty provider contributes no flags. Flag identity is the fully
 qualified provider name plus the property name — renaming either changes identity. Properties
-within a provider are ordered ordinally; provider arrival order across a compilation is not a
+within a provider are ordered ordinally, but provider arrival order across a compilation is not a
 catalog ordering contract.
 
 See [Diagnostics](diagnostics.md) for every `TFG0xx` code with examples.

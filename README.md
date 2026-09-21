@@ -89,9 +89,9 @@ Full rules and every diagnostic ID are in [Architecture](docs/architecture.md).
 
 ## Server-synced values
 
-Once connected, the synchronization worker fetches the environment's values after startup and
-refreshes them on a ~30 second interval (plus jitter), using conditional GET so unchanged reads
-cost nothing but a 304. A server outage, a denied read, or a malformed response never breaks your
+Once connected, the synchronization worker fetches the environment's values after startup, then
+refreshes them on a ~30 second interval plus jitter. It uses conditional GET, so an unchanged read
+costs nothing but a 304. A server outage, a denied read, or a malformed response never breaks your
 app — the last known values stay in effect.
 
 See [Value Synchronization](docs/value-synchronization.md) for the full protocol: revisions,
@@ -99,7 +99,7 @@ ETags, retry/backoff, and how permanent failures are told apart from recoverable
 
 ## Registration
 
-Applications declare their flags in code; the SDK registers each assembly's catalog with the
+Applications declare their flags in code. The SDK registers each assembly's catalog with the
 server in the background after startup. The server never creates a flag — only code does.
 
 See [Registration](docs/registration.md) for the catalog composition model, the HTTP contract,
@@ -144,9 +144,9 @@ TinyFlags belongs to the Tiny suite:
 | [TheTinyApplicationLayer](https://github.com/george2006/TheTinyApplicationLayer) | Example | Runnable ASP.NET Core and Blazor application using the suite |
 
 Same author, same philosophy: compile-time correctness over runtime string keys. TinyFlags has no
-SDK-level dependency on the other libraries — `TinyFlags.Server` uses TinyDispatcher internally for
+SDK-level dependency on the other libraries. `TinyFlags.Server` uses TinyDispatcher internally for
 its own command/query handling, but adopting TinyFlags does not require adopting anything else.
-`TheTinyApplicationLayer` does not include a flags example yet; that is planned once this feature
+`TheTinyApplicationLayer` does not include a flags example yet — that is planned once this feature
 set settles. See [Tiny suite](docs/tiny-suite.md).
 
 ## When to use
@@ -171,8 +171,8 @@ generator, and real PostgreSQL (via Testcontainers) and real HTTP for the server
 | --- | --- |
 | Source generator | 117 |
 | SDK runtime | 181 |
-| Server (real PostgreSQL/HTTP) | 167 |
-| **Total** | **465** |
+| Server (real PostgreSQL/HTTP) | 201 |
+| **Total** | **499** |
 
 Run everything:
 
