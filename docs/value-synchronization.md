@@ -27,12 +27,17 @@ Authentication and authorization run before conditional matching, including on 3
 
 ## The recurring loop
 
-After `ApplicationStarted`, the worker fetches once and publishes the result through
-`FeatureValues.ReplaceSnapshot`. Existing generated flag instances observe the update on their
-next read — nothing needs to be re-resolved. It then waits `RefreshInterval` (default 30 seconds)
-plus 0-10% positive jitter, fetches again carrying the last accepted snapshot's `ETag`, and
-repeats for the life of the host. The delay happens *after* each attempt completes, never on a
-fixed timer, so there is never more than one request in flight.
+After `ApplicationStarted`, the worker:
+
+1. Fetches once and publishes the result through `FeatureValues.ReplaceSnapshot`. Existing
+   generated flag instances observe the update on their next read — nothing needs to be
+   re-resolved.
+2. Waits `RefreshInterval` (default 30 seconds) plus 0-10% positive jitter.
+3. Fetches again, carrying the last accepted snapshot's `ETag`, and repeats for the life of the
+   host.
+
+The delay happens *after* each attempt completes, never on a fixed timer. There is never more than
+one request in flight.
 
 ## Failure handling
 
@@ -49,7 +54,7 @@ before the worker ever sees an outcome. What reaches the worker is one of:
   it last had.
 
 In every case, local flag values never disappear and never throw. An environment that has never
-synced successfully falls back to the declared code defaults; one that synced before keeps its
+synced successfully falls back to the declared code defaults. One that synced before keeps its
 last known values through any later outage.
 
 ## Independent of registration
