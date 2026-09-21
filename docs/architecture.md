@@ -102,3 +102,6 @@ Server (`TinyFlags.Server`, see [Running the Server](server.md)):
   `FeatureValues`, and synchronization never waits for registration to complete or succeed.
 - The server never originates a flag. It stores and serves values for definitions the SDK already
   registered; see [Registration](registration.md) for the exact contract.
+- The client only knows a base URL, a Bearer token, and three HTTP routes — `TinyFlags.Server` is
+  the reference implementation, not a hard dependency. See the [Server Protocol](protocol.md) for
+  the full wire contract if you're implementing your own.
