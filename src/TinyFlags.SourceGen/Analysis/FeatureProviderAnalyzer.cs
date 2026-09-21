@@ -170,9 +170,9 @@ internal sealed class FeatureProviderAnalyzer
             return FeatureValueKind.Boolean;
         }
 
-        var isNonNullableString = property.Type.SpecialType == SpecialType.System_String
-            && property.NullableAnnotation != NullableAnnotation.Annotated;
-        return isNonNullableString ? FeatureValueKind.String : null;
+        var isString = property.Type.SpecialType == SpecialType.System_String;
+        var isNonNullable = property.NullableAnnotation != NullableAnnotation.Annotated;
+        return isString && isNonNullable ? FeatureValueKind.String : null;
     }
 
     private static SourceLocation ReadLocation(Compilation compilation, Location location)
