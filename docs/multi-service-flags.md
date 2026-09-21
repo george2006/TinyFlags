@@ -8,8 +8,8 @@ two independent declarations produce the same identity — nothing more.
 Flag identity is a string: the fully qualified provider type name plus the property name (for
 example `MyApp.Checkout.NuevoCheckout`), computed independently by the generator in each
 compilation. It does not depend on runtime type identity, a shared assembly, or any server-side
-concept of "service" — two completely separate codebases produce the same key purely by writing
-the same namespace, class name, and property name.
+concept of "service". Two completely separate codebases produce the same key purely by writing the
+same namespace, class name, and property name.
 
 ## How to do it
 
@@ -64,4 +64,5 @@ people, not the generator.
 
 [`samples/MultiService`](../samples/MultiService/README.md) runs two independent services against
 a Dockerized `TinyFlags.Server`, each with its own private flag plus one identical, shared
-declaration — flip the shared value in the admin dashboard and watch both terminals pick it up.
+declaration. `docker compose up`, then flip the shared value in the admin dashboard: `curl` both
+services' `/flags` endpoint and watch them agree.
