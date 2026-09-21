@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using System.Threading;
 using TinyFlags.SourceGen.Generation.Planning;
@@ -83,18 +82,9 @@ internal sealed class FeatureAccessEmitter
         source.Append(isBoolean ? "bool" : "string").Append(" @").Append(feature.Name)
             .Append(" => this.").Append(plan.FieldName)
             .Append(isBoolean ? ".GetBoolean(" : ".GetString(");
-        WriteString(source, feature.Key);
+        FeatureLiteralWriter.WriteString(source, feature.Key);
         source.Append(", ");
-
-        if (isBoolean)
-        {
-            source.Append((bool)feature.DefaultValue ? "true" : "false");
-        }
-        else
-        {
-            WriteString(source, (string)feature.DefaultValue);
-        }
-
+        FeatureLiteralWriter.WriteDefaultValue(source, feature.Kind, feature.DefaultValue);
         source.AppendLine(");");
     }
 
@@ -102,27 +92,5 @@ internal sealed class FeatureAccessEmitter
     {
         return name is "Equals" or "GetHashCode" or "GetType" or "ToString"
             or "ReferenceEquals" or "MemberwiseClone" or "Finalize";
-    }
-
-    private static void WriteString(StringBuilder source, string value)
-    {
-        source.Append('"');
-        foreach (var character in value)
-        {
-            if (character == '"' || character == '\\')
-            {
-                source.Append('\\').Append(character);
-            }
-            else if (character < ' ' || character > '~')
-            {
-                source.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                source.Append(character);
-            }
-        }
-
-        source.Append('"');
     }
 }
