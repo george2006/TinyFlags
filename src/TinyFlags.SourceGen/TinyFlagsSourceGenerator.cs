@@ -1,10 +1,12 @@
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using TinyFlags.SourceGen.Analysis;
 using TinyFlags.SourceGen.Diagnostics;
 using TinyFlags.SourceGen.Discovery;
 using TinyFlags.SourceGen.Generation;
+using TinyFlags.SourceGen.Generation.Planning;
 using TinyFlags.SourceGen.Model;
 using TinyFlags.SourceGen.Validation;
 
@@ -15,7 +17,18 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var analysis = context.SyntaxProvider
+        var analysis = Analyze(context.SyntaxProvider);
+        var validation = Validate(analysis);
+        var providers = ExtractValidProviders(validation);
+
+        GenerateAccessClasses(context, providers);
+        RegisterCatalog(context, providers);
+        ReportValidationDiagnostics(context, validation);
+    }
+
+    private static IncrementalValuesProvider<FeatureProviderAnalysis> Analyze(SyntaxValueProvider syntaxProvider)
+    {
+        return syntaxProvider
             .CreateSyntaxProvider(
                 FeatureProviderDiscovery.IsCandidateDeclaration,
                 static (candidate, cancellationToken) =>
@@ -23,12 +36,27 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
             .WithTrackingName("FeatureAnalysis")
             .Where(static provider => provider is not null)
             .Select(static (provider, _) => provider!);
+    }
 
-        var validation = analysis.Select(static (provider, cancellationToken) =>
-            new FeatureDeclarationValidator().Validate(provider, cancellationToken))
+    private static IncrementalValuesProvider<FeatureValidationResult> Validate(
+        IncrementalValuesProvider<FeatureProviderAnalysis> analysis)
+    {
+        return analysis
+            .Select(static (provider, cancellationToken) =>
+                new FeatureDeclarationValidator().Validate(provider, cancellationToken))
             .WithTrackingName("FeatureValidation");
+    }
 
-        var providers = validation.SelectMany(static (result, _) => result.Providers);
+    private static IncrementalValuesProvider<FeatureProviderDefinition> ExtractValidProviders(
+        IncrementalValuesProvider<FeatureValidationResult> validation)
+    {
+        return validation.SelectMany(static (result, _) => result.Providers);
+    }
+
+    private static void GenerateAccessClasses(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<FeatureProviderDefinition> providers)
+    {
         var sources = providers
             .Select(static (provider, cancellationToken) =>
                 new FeatureGeneration().Generate(provider, cancellationToken))
@@ -36,9 +64,12 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(sources, static (output, source) =>
             output.AddSource(source.HintName, SourceText.From(source.Source, Encoding.UTF8)));
+    }
 
-        RegisterCatalog(context, providers);
-
+    private static void ReportValidationDiagnostics(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<FeatureValidationResult> validation)
+    {
         // Rebind cached issues to the current compilation's syntax trees before reporting.
         context.RegisterSourceOutput(validation.Combine(context.CompilationProvider), static (output, input) =>
         {
@@ -53,19 +84,9 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<FeatureProviderDefinition> providers)
     {
-        var plans = providers.Collect()
-            .Select(static (definitions, cancellationToken) =>
-                new FeatureGeneration().PlanCatalog(definitions, cancellationToken))
-            .WithTrackingName("FeatureCatalogPlanning");
-        var issues = context.CompilationProvider
-            .Select(static (compilation, cancellationToken) =>
-                FeatureCatalogAnalyzer.Analyze(compilation, cancellationToken));
-        var sources = plans.Combine(issues)
-            .Select(static (input, cancellationToken) =>
-                input.Right is null
-                    ? new FeatureGeneration().GenerateCatalog(input.Left, cancellationToken)
-                    : ((string HintName, string Source)?)null)
-            .WithTrackingName("FeatureCatalogGeneration");
+        var plans = PlanCatalog(providers);
+        var issues = AnalyzeCatalogConflicts(context.CompilationProvider);
+        var sources = GenerateCatalog(plans, issues);
 
         context.RegisterSourceOutput(sources, static (output, source) =>
         {
@@ -74,6 +95,49 @@ public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
                 output.AddSource(catalog.HintName, SourceText.From(catalog.Source, Encoding.UTF8));
             }
         });
+        ReportCatalogDiagnostics(context, issues);
+    }
+
+    private static IncrementalValueProvider<FeatureCatalogPlan> PlanCatalog(
+        IncrementalValuesProvider<FeatureProviderDefinition> providers)
+    {
+        return providers.Collect()
+            .Select(static (definitions, cancellationToken) =>
+                new FeatureGeneration().PlanCatalog(definitions, cancellationToken))
+            .WithTrackingName("FeatureCatalogPlanning");
+    }
+
+    private static IncrementalValueProvider<FeatureIssue?> AnalyzeCatalogConflicts(
+        IncrementalValueProvider<Compilation> compilationProvider)
+    {
+        return compilationProvider.Select(static (compilation, cancellationToken) =>
+            FeatureCatalogAnalyzer.Analyze(compilation, cancellationToken));
+    }
+
+    private static IncrementalValueProvider<(string HintName, string Source)?> GenerateCatalog(
+        IncrementalValueProvider<FeatureCatalogPlan> plans,
+        IncrementalValueProvider<FeatureIssue?> issues)
+    {
+        return plans.Combine(issues)
+            .Select(static (input, cancellationToken) => CreateCatalogSource(input.Left, input.Right, cancellationToken))
+            .WithTrackingName("FeatureCatalogGeneration");
+    }
+
+    private static (string HintName, string Source)? CreateCatalogSource(
+        FeatureCatalogPlan plan, FeatureIssue? conflict, CancellationToken cancellationToken)
+    {
+        if (conflict is not null)
+        {
+            return null;
+        }
+
+        return new FeatureGeneration().GenerateCatalog(plan, cancellationToken);
+    }
+
+    private static void ReportCatalogDiagnostics(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValueProvider<FeatureIssue?> issues)
+    {
         context.RegisterSourceOutput(issues.Combine(context.CompilationProvider), static (output, input) =>
         {
             if (input.Left is not null)

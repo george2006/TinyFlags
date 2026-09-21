@@ -146,9 +146,12 @@ internal sealed class FeatureProviderAnalyzer
             ? generatedName
             : namespaceName + "." + generatedName;
 
-        return compilation.Assembly.GetTypeByMetadataName(qualifiedName) is not null
-            || provider.ContainingNamespace.GetNamespaceMembers().Any(member => member.Name == generatedName)
-            || provider.GetMembers(generatedName).OfType<IPropertySymbol>().Any();
+        var conflictsWithExistingType = compilation.Assembly.GetTypeByMetadataName(qualifiedName) is not null;
+        var conflictsWithSiblingNamespace = provider.ContainingNamespace.GetNamespaceMembers()
+            .Any(member => member.Name == generatedName);
+        var conflictsWithOwnProperty = provider.GetMembers(generatedName).OfType<IPropertySymbol>().Any();
+
+        return conflictsWithExistingType || conflictsWithSiblingNamespace || conflictsWithOwnProperty;
     }
 
     private static bool HasSupportedPropertyShape(IPropertySymbol property)
@@ -167,15 +170,11 @@ internal sealed class FeatureProviderAnalyzer
             return FeatureValueKind.Boolean;
         }
 
-        return property.Type.SpecialType == SpecialType.System_String
-            && property.NullableAnnotation != NullableAnnotation.Annotated
-                ? FeatureValueKind.String
-                : null;
+        var isString = property.Type.SpecialType == SpecialType.System_String;
+        var isNonNullable = property.NullableAnnotation != NullableAnnotation.Annotated;
+        return isString && isNonNullable ? FeatureValueKind.String : null;
     }
 
     private static SourceLocation ReadLocation(Compilation compilation, Location location)
-    {
-        var treeIndex = compilation.SyntaxTrees.TakeWhile(tree => tree != location.SourceTree).Count();
-        return new SourceLocation(treeIndex, location.SourceSpan.Start, location.SourceSpan.Length);
-    }
+        => SourceLocationReader.Read(compilation, location);
 }

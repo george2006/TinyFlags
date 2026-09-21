@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text;
 using System.Threading;
 using TinyFlags.SourceGen.Generation.Planning;
@@ -68,40 +67,9 @@ internal sealed class FeatureCatalogEmitter
         var isBoolean = feature.Kind == FeatureValueKind.Boolean;
         source.Append("                global::TinyFlags.FeatureDefinition.")
             .Append(isBoolean ? "Boolean(" : "String(");
-        WriteString(source, feature.Key);
+        FeatureLiteralWriter.WriteString(source, feature.Key);
         source.Append(", ");
-
-        if (isBoolean)
-        {
-            source.Append((bool)feature.DefaultValue ? "true" : "false");
-        }
-        else
-        {
-            WriteString(source, (string)feature.DefaultValue);
-        }
-
+        FeatureLiteralWriter.WriteDefaultValue(source, feature.Kind, feature.DefaultValue);
         source.AppendLine("),");
-    }
-
-    private static void WriteString(StringBuilder source, string value)
-    {
-        source.Append('"');
-        foreach (var character in value)
-        {
-            if (character == '"' || character == '\\')
-            {
-                source.Append('\\').Append(character);
-            }
-            else if (character < ' ' || character > '~')
-            {
-                source.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
-            }
-            else
-            {
-                source.Append(character);
-            }
-        }
-
-        source.Append('"');
     }
 }
