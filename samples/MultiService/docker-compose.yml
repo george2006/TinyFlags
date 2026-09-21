@@ -19,13 +19,17 @@ services:
   # API key over plain HTTP to a non-local host. orders-service and payments-service below share
   # this container's network namespace so "http://localhost" is genuinely correct for them, not a
   # bypass of that check. Their ports are declared here for the same reason.
+  #
+  # This pulls the published TinyFlags.Server image rather than building from source — the server
+  # lives in its own repo now (github.com/george2006/TinyFlags.Server). TinyFlags__License is a
+  # real, time-limited evaluation license (expires ~2026-09-28); replace it with your own once it
+  # expires, requested from TinyBoutique. Without a valid license the server refuses to start.
   tinyflags-server:
-    build:
-      context: ../../src/TinyFlags.Server
-    image: tinyflags-server-sample
+    image: ghcr.io/george2006/tinyflags-server:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+      TinyFlags__License: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqZHVyYmFuQGdtYWlsLmNvbSIsIm5iZiI6MTc5MDAxNTEwNCwiZXhwIjoxNzkwNjE5OTA0LCJpYXQiOjE3OTAwMTUxMDR9.P04LFx5lyC8gM2ZTRkRCqIJKGJtWSsmhcwpBLscerbw4eg9mM-bNzf_dEdhENTnAvoiTEOdVNltpK7kVfbxst1vCofgHKXBw508ftX_uqNa1YBegZwCWOONhwRcVXWOrnW4Nfq-qcvzFzGeyWqwHzgW6fgZlb92rWKRfLnqZTg6xoALHEZOle9G34RPzhqXHMrzlDRSIPej7N5wcD8oqf7VLvv_YveNDRUHQFapYzip5RJOcDfzQfae_iQjqAm4nbITe7OkSUSb5XnMpA7Cn_ezbWxX-0WR2-2fCkxTrhq-E7BIzQKhfswz3KZASQIIkIfFRC2-PG6UCmM4B1CPwHw"
     ports:
       - "127.0.0.1:8085:8080" # TinyFlags.Server itself / the admin dashboard
       - "127.0.0.1:8090:8081" # orders-service
@@ -37,8 +41,10 @@ services:
   # One-shot: migrates the database, creates a project/environment/client key, and issues an
   # admin token — writing the two secrets to a shared volume instead of a console you'd copy from.
   # Runs once per `docker compose up`, then exits; orders-service and payments-service wait for it.
+  # CLI commands (--migrate, --seed-development, --issue-admin-key) never need a license — only
+  # the running web server does, so this service doesn't set TinyFlags__License.
   bootstrap:
-    image: tinyflags-server-sample
+    image: ghcr.io/george2006/tinyflags-server:latest
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"

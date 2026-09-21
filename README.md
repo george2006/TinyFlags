@@ -114,8 +114,6 @@ and authentication.
 - [Server Protocol](docs/protocol.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Multi-Service Sample](samples/MultiService/README.md) — a runnable walkthrough, two services and a Dockerized server
-- [Running the Server](docs/server.md)
-- [Admin Dashboard](docs/admin-dashboard.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Tiny suite](docs/tiny-suite.md)
 
@@ -140,14 +138,14 @@ TinyFlags belongs to the Tiny suite:
 | [TinyDispatcher](https://github.com/george2006/TinyDispatcher) | Library | Command and query execution |
 | [TinyValidations](https://github.com/george2006/TinyValidations) | Library | Application input validation |
 | [TinyEvents](https://github.com/george2006/TinyEvents) | Library | Reliable application-event handling through the outbox pattern |
-| [TinyFlags](https://github.com/george2006/TinyFlags) | Library + Server | Typed feature flag declarations, with an optional server for centrally managed values |
+| [TinyFlags](https://github.com/george2006/TinyFlags) | Library | Typed feature flag declarations |
 | [TheTinyApplicationLayer](https://github.com/george2006/TheTinyApplicationLayer) | Example | Runnable ASP.NET Core and Blazor application using the suite |
 
 Same author, same philosophy: compile-time correctness over runtime string keys. TinyFlags has no
-SDK-level dependency on the other libraries. `TinyFlags.Server` uses TinyDispatcher internally for
-its own command/query handling, but adopting TinyFlags does not require adopting anything else.
-`TheTinyApplicationLayer` does not include a flags example yet — that is planned once this feature
-set settles. See [Tiny suite](docs/tiny-suite.md).
+SDK-level dependency on the other libraries. Its reference server, `TinyFlags.Server`, is a
+separate, privately-hosted repo — this one only knows the [wire protocol](docs/protocol.md) it
+speaks, not its implementation. `TheTinyApplicationLayer` does not include a flags example yet —
+that is planned once this feature set settles. See [Tiny suite](docs/tiny-suite.md).
 
 ## When to use
 
@@ -165,14 +163,13 @@ a deliberate non-goal, not a missing feature.
 ## Test Coverage & Hardening
 
 TinyFlags is verified with real collaborators, not mocks: real Roslyn compilations for the
-generator, and real PostgreSQL (via Testcontainers) and real HTTP for the server and SDK.
+generator, and a real loopback HTTP server for the SDK's registration/synchronization workers.
 
 | Component | Tests |
 | --- | --- |
 | Source generator | 117 |
 | SDK runtime | 181 |
-| Server (real PostgreSQL/HTTP) | 201 |
-| **Total** | **499** |
+| **Total** | **298** |
 
 Run everything:
 
@@ -180,18 +177,16 @@ Run everything:
 dotnet test TinyFlags.slnx -warnaserror
 ```
 
-Requires the .NET 10 SDK, .NET 8 and ASP.NET Core 8 runtimes, PowerShell, NuGet access, and a
-running Docker engine with Linux containers for the server integration suite.
+Requires a .NET SDK (net8.0 or later), PowerShell, and NuGet access for the packaging
+verification script.
 
 ## Components
 
 ```text
 src/TinyFlags                  Marker, local values and catalog composition (net8.0)
 src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
-src/TinyFlags.Server           Registration/values API, PostgreSQL persistence (net10.0)
 tests/TinyFlags.Tests
 tests/TinyFlags.SourceGen.Tests
-tests/TinyFlags.Server.IntegrationTests
 ```
 
 See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).

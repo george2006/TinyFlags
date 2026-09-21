@@ -93,7 +93,8 @@ combination.
 Revocation is checked on every new request — a request already authenticated is allowed to finish.
 Multiple keys can coexist during rotation.
 
-See [Running the Server](server.md#issuing-keys) to issue a key from the command line.
+See [TinyFlags.Server's docs](https://github.com/george2006/TinyFlags.Server/blob/main/docs/server.md#issuing-keys)
+to issue a key from the command line.
 
 ## Concurrency and consistency
 

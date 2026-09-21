@@ -93,6 +93,7 @@ instance observes updates automatically. No re-resolution needed.
 
 ## 5) Run the server
 
-To try Option B end to end, you need a running `TinyFlags.Server` and an issued API key. See
-[Running the Server](server.md) for the Docker Compose setup, migrations, and the
-`--seed-development` command that prints a usable key.
+To try Option B end to end, you need a running server and an issued API key: either
+[`TinyFlags.Server`](https://github.com/george2006/TinyFlags.Server), the reference
+implementation, or your own, speaking the same [wire protocol](protocol.md). See the
+[Multi-Service Sample](../samples/MultiService/README.md) for a runnable walkthrough.
