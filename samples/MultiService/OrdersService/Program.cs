@@ -1,10 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using OrdersService;
 using Shared;
 using TinyFlags;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddTinyFlags(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]
@@ -15,16 +13,12 @@ builder.Services.AddTinyFlags(options =>
     options.RefreshInterval = TimeSpan.FromSeconds(5);
 });
 
-var host = builder.Build();
-await host.StartAsync();
+var app = builder.Build();
 
-var checkout = host.Services.GetRequiredService<CheckoutFeatureFlags>();
-var promotions = host.Services.GetRequiredService<PromotionsFeatureFlags>();
-
-Console.WriteLine("OrdersService started. Polling TinyFlags every 5s — Ctrl+C to stop.");
-while (true)
+app.MapGet("/flags", (CheckoutFeatureFlags checkout, PromotionsFeatureFlags promotions) => new
 {
-    Console.WriteLine($"[{DateTimeOffset.Now:T}] ExpressCheckout={checkout.ExpressCheckout}  " +
-        $"Shared.Promotions.HolidaySaleBanner={promotions.HolidaySaleBanner}");
-    await Task.Delay(TimeSpan.FromSeconds(5));
-}
+    expressCheckout = checkout.ExpressCheckout,
+    sharedHolidaySaleBanner = promotions.HolidaySaleBanner
+});
+
+app.Run();
