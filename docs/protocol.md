@@ -94,9 +94,9 @@ not checked by the client.
 ### 3. Update values (write)
 
 Nothing in the SDK calls this — generated flags never write, only read. It exists purely for
-external tooling (`TinyFlags.Server`'s own admin dashboard uses it to let a human flip a flag). A
+external tooling; `TinyFlags.Server`'s own admin dashboard uses it to let a human flip a flag. A
 custom server can implement it however it likes, give it a completely different shape, or omit it
-entirely — nothing about the read path depends on it. Shown here for completeness, describing what
+entirely: nothing about the read path depends on it. Shown here for completeness, describing what
 `TinyFlags.Server` itself does:
 
 ```http
@@ -134,11 +134,11 @@ this is what a permanent, non-retried failure looks like from your server's resp
 | Any other `4xx` | Request rejected |
 | Anything else (unclassified, or a malformed body) | Invalid response |
 
-`408`, `429`, and every `5xx` never reach that table — the client retries them first, with
+`408`, `429`, and every `5xx` never reach that table. The client retries them first, with
 exponential backoff (`RetryDelay` up to `MaxRetryDelay`, jittered), honoring a `Retry-After` header
-on `429`/`503` if you send one. Retries continue indefinitely (bounded only by the caller's own
-cancellation), so a server that's persistently down doesn't "fail" the client — it just keeps the
-host running on its last known values until the server recovers.
+on `429`/`503` if you send one. Retries continue indefinitely — bounded only by the caller's own
+cancellation. A server that's persistently down doesn't "fail" the client; it just keeps the host
+running on its last known values until the server recovers.
 
 ## What must match exactly vs. what's yours to design
 
