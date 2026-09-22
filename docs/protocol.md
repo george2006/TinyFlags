@@ -1,18 +1,25 @@
-# Server protocol
+# Server protocol (HTTP)
 
-`TinyFlagsApiClient` — the HTTP client inside the `TinyFlags` NuGet package — never references
-`TinyFlags.Server`. It only knows a base `Endpoint`, a Bearer `ApiKey`, and three routes. Anything
-that speaks this contract can stand in for `TinyFlags.Server`: your own ASP.NET Core app, a
-different language entirely, a thin layer in front of an existing feature-flag store. This page is
-that contract, written for someone implementing a server rather than someone using the SDK.
+This is `TinyFlags.Http`'s wire contract — one of two reference transports, not the only way to
+speak to a `TinyFlags.Server`. `TinyFlagsApiClient`, the HTTP client inside the `TinyFlags.Http`
+package, never references `TinyFlags.Server` directly; it only knows a base `Endpoint`, a Bearer
+`ApiKey`, and three routes. Anything that speaks this contract can stand in for `TinyFlags.Server`:
+your own ASP.NET Core app, a different language entirely, a thin layer in front of an existing
+feature-flag store. This page is that contract, written for someone implementing an HTTP server
+rather than someone using the SDK.
 
-`TinyFlags.Server` is the reference implementation, not a requirement — see
+If you're implementing gRPC instead, the equivalent contract is `tinyflags.proto`
+(`src/TinyFlags.Grpc/Protos/tinyflags.proto`), not this page — the two protocols aren't
+translations of each other, each is its own complete contract. If you're implementing the *client*
+side of either, or a transport that's neither, see [Building a Transport](building-a-transport.md).
+
+`TinyFlags.Server` is the reference implementation of both, not a requirement — see
 [TinyFlags.Server](https://github.com/george2006/TinyFlags.Server) if you'd rather deploy it than
 write your own.
 
 ## Endpoints
 
-All three are relative to `TinyFlagsClientOptions.Endpoint` and authenticated the same way:
+All three are relative to `TinyFlagsHttpOptions.Endpoint` and authenticated the same way:
 `Authorization: Bearer <api-key>`. The token is opaque to the client — it's passed through
 verbatim, so your server can issue and validate it however it wants.
 

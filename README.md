@@ -96,20 +96,23 @@ Full rules and every diagnostic ID are in [Architecture](docs/architecture.md).
 
 ## Server-synced values
 
-Once connected, the synchronization worker fetches the environment's values after startup, then
-refreshes them on a ~30 second interval plus jitter. It uses conditional GET, so an unchanged read
-costs nothing but a 304. A server outage, a denied read, or a malformed response never breaks your
-app — the last known values stay in effect.
+Once connected, one worker keeps `FeatureValues` fresh — which one depends on your transport.
+`TinyFlags.Http` polls: fetches after startup, refreshes on a ~30 second interval plus jitter,
+conditional `GET` so an unchanged read costs nothing but a 304. `TinyFlags.Grpc` pushes instead: no
+polling interval, the server sends a fresh snapshot the moment something changes, real-time in the
+tens-of-milliseconds range. Either way, a server outage, a denied read, or a malformed response
+never breaks your app — the last known values stay in effect.
 
-See [Value Synchronization](docs/value-synchronization.md) for the full protocol: revisions,
-ETags, retry/backoff, and how permanent failures are told apart from recoverable ones.
+See [Value Synchronization](docs/value-synchronization.md) for the full picture: revisions,
+cursors, retry/reconnect, and how permanent failures are told apart from recoverable ones.
 
 ## Registration
 
-Applications declare their flags in code. The SDK registers each assembly's catalog with the
-server in the background after startup. The server never creates a flag — only code does.
+Applications declare their flags in code. Whichever transport you use registers each assembly's
+catalog with the server in the background after startup. The server never creates a flag — only
+code does.
 
-See [Registration](docs/registration.md) for the catalog composition model, the HTTP contract,
+See [Registration](docs/registration.md) for the catalog composition model, the wire contracts,
 and authentication.
 
 ## Documentation
@@ -118,7 +121,8 @@ and authentication.
 - [Architecture](docs/architecture.md)
 - [Registration](docs/registration.md)
 - [Value Synchronization](docs/value-synchronization.md)
-- [Server Protocol](docs/protocol.md)
+- [Server Protocol (HTTP)](docs/protocol.md)
+- [Building a Transport](docs/building-a-transport.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Multi-Service Sample](samples/MultiService/README.md) — a runnable walkthrough, two services and a Dockerized server
 - [Diagnostics](docs/diagnostics.md)
@@ -150,9 +154,10 @@ TinyFlags belongs to the Tiny suite:
 
 Same author, same philosophy: compile-time correctness over runtime string keys. TinyFlags has no
 SDK-level dependency on the other libraries. Its reference server, `TinyFlags.Server`, is a
-separate, privately-hosted repo — this one only knows the [wire protocol](docs/protocol.md) it
-speaks, not its implementation. `TheTinyApplicationLayer` does not include a flags example yet —
-that is planned once this feature set settles. See [Tiny suite](docs/tiny-suite.md).
+separate, privately-hosted repo — this one only knows the wire contracts it speaks (HTTP or gRPC,
+see [Building a Transport](docs/building-a-transport.md)), not its implementation.
+`TheTinyApplicationLayer` does not include a flags example yet — that is planned once this feature
+set settles. See [Tiny suite](docs/tiny-suite.md).
 
 ## When to use
 

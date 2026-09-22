@@ -2,15 +2,24 @@
 
 TinyFlags consists of:
 
-- a small runtime core (`FeatureValues`, catalog composition, DI glue)
+- a small runtime core (`FeatureValues`, catalog composition, DI glue, and the transport
+  contracts every server integration implements against)
 - a source generator that discovers, analyzes, validates and emits typed access classes
-- an SDK that talks to the server (registration + value synchronization)
-- `TinyFlags.Server`, a PostgreSQL-backed HTTP service that stores definitions and serves values
+- reference transport implementations — `TinyFlags.Http` (registration + polling) and
+  `TinyFlags.Grpc` (registration + real-time push) — each a complete, independent way to talk to
+  a server; neither depends on the other existing
+- `TinyFlags.Server`, a PostgreSQL-backed reference server speaking both wire protocols
+
+No transport is privileged. `TinyFlags.Http` isn't "the SDK's built-in client" with `TinyFlags.Grpc`
+bolted on beside it — both are equal implementations of the same core contracts, and the whole
+point of the split is that a third one (yours) is exactly as legitimate as either. See
+[Building a Transport](building-a-transport.md) if that's what you're here for.
 
 ```text
-src/TinyFlags                  Marker, local values and catalog composition (net8.0)
+src/TinyFlags                  Marker, local values, catalog composition, transport contracts (net8.0)
+src/TinyFlags.Http             Reference transport: HTTP registration + polling (net8.0)
+src/TinyFlags.Grpc             Reference transport: gRPC registration + real-time push (net8.0)
 src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
-src/TinyFlags.Server           Registration/values API, PostgreSQL persistence (net10.0)
 ```
 
 ## Generator pipeline
@@ -74,24 +83,31 @@ Local-only (always present):
 | Generated `XxxFeatureFlags` | Typed getters backed by `FeatureValues`, one per provider |
 | `TinyFlagsBootstrap` | Cross-assembly catalog composition |
 
-Added when `AddTinyFlags` is configured with server options:
+Transport contracts, in core `TinyFlags` (`Abstractions/`) — implemented by `TinyFlags.Http`,
+`TinyFlags.Grpc`, or your own package:
 
 | Component | Responsibility |
 | --- | --- |
-| `TinyFlagsApiClient` | Translates HTTP into application results; owns the retry policy and snapshot reader |
-| `TinyFlagsRetryPolicy` | Attempts, classification, backoff and cancellation for one HTTP operation |
-| `FeatureSnapshotReader` | Bounded body reading, JSON/ETag validation, snapshot construction |
-| `TinyFlagsRegistrationWorker` | Sends the composed catalog to the server after startup |
-| `TinyFlagsSynchronizationWorker` | Fetches and republishes values after startup, then on a recurring interval — the SDK's only writer to `FeatureValues` |
+| `IFeatureDefinitionsTransport` | Sends the composed catalog to a server. One-shot request/response — no pull or push variant, since there's nothing to pull or push about registration |
+| `IFeatureValuesTransport` | Pull: fetch current values, conditionally on a cursor already held locally |
+| `IFeatureValuesSubscription` | Push: stream value changes as they happen, instead of being polled for them |
+| `FeatureValuesCursor` / `FeatureValuesResult` | Identity/staleness and the payload, shared by both values contracts |
+| `TinyFlagsRegistrationWorker` | Drains `IFeatureDefinitionsTransport` once, after startup |
+| `TinyFlagsSynchronizationWorker` | Drains `IFeatureValuesTransport` on a recurring interval — the only writer to `FeatureValues` when using a pull transport |
+| `TinyFlagsValuesWatchWorker` | Drains `IFeatureValuesSubscription`'s stream — the only writer to `FeatureValues` when using a push transport |
+
+Each transport picks which of these it wires up via its own `Use...Transport(...)` extension on
+`TinyFlagsOptions`, called from `AddTinyFlags`'s configure callback — see
+[Building a Transport](building-a-transport.md) for exactly how that plugs in.
 
 Server (`TinyFlags.Server` — a separate, privately-hosted reference implementation; this is its
 conceptual shape, not something you need access to it to understand):
 
 | Component | Responsibility |
 | --- | --- |
-| `Features/RegisterDefinitions` | TinyDispatcher command that persists a registration batch |
-| `Features/GetFeatureValues` | TinyDispatcher query that reads one consistent revision + values snapshot |
-| `Authentication/ClientApiKey` | Hashed, scoped, per-environment credentials with explicit grants |
+| `Features/RegisterDefinitions` | TinyDispatcher command that persists a registration batch — dispatched by both the REST and gRPC registration endpoints |
+| `Features/GetFeatureValues` | TinyDispatcher query that reads one consistent revision + values snapshot — dispatched by both the REST endpoint and the gRPC `Watch` service |
+| `Authentication/ClientApiKey` | Hashed, scoped, per-environment credentials with explicit grants, checked identically for REST and gRPC (gRPC metadata surfaces through the same ASP.NET Core auth middleware as HTTP headers) |
 | `Persistence` | EF Core + PostgreSQL: projects, environments, definitions, `ValuesRevision` |
 
 ## Ownership boundaries
@@ -99,10 +115,12 @@ conceptual shape, not something you need access to it to understand):
 - Contributing assemblies discover and validate their own providers at build time; nothing runs at
   runtime to find them.
 - The host is the sole composer of the final catalog (`TinyFlagsBootstrap.GetDefinitions()`).
-- The SDK's registration and synchronization workers are independent: registration never mutates
-  `FeatureValues`, and synchronization never waits for registration to complete or succeed.
-- The server never originates a flag. It stores and serves values for definitions the SDK already
+- Registration and value sync are independent regardless of transport: registration never mutates
+  `FeatureValues`, and no values worker ever waits for registration to complete or succeed.
+- The server never originates a flag. It stores and serves values for definitions a client already
   registered; see [Registration](registration.md) for the exact contract.
-- The client only knows a base URL, a Bearer token, and three HTTP routes — `TinyFlags.Server` is
-  the reference implementation, not a hard dependency. See the [Server Protocol](protocol.md) for
-  the full wire contract if you're implementing your own.
+- A transport only ever knows a base address, a Bearer token, and the contracts above — no
+  transport, including the ones we ship, has special access the interfaces don't expose. See the
+  [Server Protocol](protocol.md) for the HTTP wire contract, or `tinyflags.proto` for gRPC's, if
+  you're implementing your own against `TinyFlags.Server`; see
+  [Building a Transport](building-a-transport.md) if you're implementing the client side instead.

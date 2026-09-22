@@ -57,6 +57,7 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
     public async IAsyncEnumerable<FeatureValuesResult> WatchAsync(IReadOnlyList<FeatureDefinition> catalog,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        FeatureValuesCursor? current = null;
         while (!ct.IsCancellationRequested)
         {
             using var call = valuesClient.Watch(new WatchRequest(), CreateCallOptions(ct));
@@ -64,7 +65,7 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
             {
                 while (true)
                 {
-                    var (outcome, value) = await StepAsync(enumerator, ct).ConfigureAwait(false);
+                    var (outcome, value) = await StepAsync(enumerator, current, ct).ConfigureAwait(false);
                     if (outcome == StepOutcome.Completed)
                     {
                         yield break;
@@ -73,7 +74,8 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
                     {
                         break;
                     }
-                    yield return value!;
+                    current = value!.Cursor;
+                    yield return value;
                 }
             }
             await Task.Delay(options.ReconnectDelay, ct).ConfigureAwait(false);
@@ -81,13 +83,24 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
     }
 
     private static async Task<(StepOutcome Outcome, FeatureValuesResult? Value)> StepAsync(
-        IAsyncEnumerator<ValuesSnapshot> enumerator, CancellationToken ct)
+        IAsyncEnumerator<ValuesSnapshot> enumerator, FeatureValuesCursor? current, CancellationToken ct)
     {
         try
         {
-            return await enumerator.MoveNextAsync().ConfigureAwait(false)
-                ? (StepOutcome.Value, ToResult(enumerator.Current))
-                : (StepOutcome.Completed, null);
+            if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+            {
+                return (StepOutcome.Completed, null);
+            }
+
+            var result = ToResult(enumerator.Current);
+            // Cross-checked on every message, not just the first - catches a misbehaving server
+            // or a credential that started pointing at a different environment mid-stream, not
+            // just a mismatch at connect time.
+            if (current is not null && result.Cursor!.EnvironmentId != current.EnvironmentId)
+            {
+                throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+            }
+            return (StepOutcome.Value, result);
         }
         catch (RpcException error) when (IsTransient(error.StatusCode) && !ct.IsCancellationRequested)
         {
