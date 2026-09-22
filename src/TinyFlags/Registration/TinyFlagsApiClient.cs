@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDisposable
+internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatureValuesTransport, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -56,7 +56,7 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDispos
     }
 
     public Task<FeatureValuesResult> GetValuesAsync(IReadOnlyList<FeatureDefinition> catalog,
-        FeatureSnapshot? current = null, CancellationToken ct = default)
+        FeatureValuesCursor? current = null, CancellationToken ct = default)
     {
         var definitions = CopyCatalog(catalog);
         return retry.ExecuteAsync(token => SendValuesAsync(current, token),
@@ -79,7 +79,7 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDispos
         return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendValuesAsync(FeatureSnapshot? current, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendValuesAsync(FeatureValuesCursor? current, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, valuesEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
@@ -103,7 +103,7 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDispos
     }
 
     private async Task<FeatureValuesResult> ReadValuesAsync(HttpResponseMessage response,
-        IReadOnlyList<FeatureDefinition> catalog, FeatureSnapshot? current, CancellationToken ct)
+        IReadOnlyList<FeatureDefinition> catalog, FeatureValuesCursor? current, CancellationToken ct)
     {
         try
         {
@@ -117,14 +117,14 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDispos
                 throw RejectedResponse(response.StatusCode);
             }
 
-            var snapshot = await snapshotReader.ReadAsync(response, catalog, ct).ConfigureAwait(false);
-            if (current is not null && snapshot.EnvironmentId != current.EnvironmentId)
+            var (cursor, values) = await snapshotReader.ReadAsync(response, catalog, ct).ConfigureAwait(false);
+            if (current is not null && cursor.EnvironmentId != current.EnvironmentId)
             {
                 throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
             }
-            return current is not null && snapshot.Revision <= current.Revision
+            return current is not null && cursor.Revision <= current.Revision
                 ? FeatureValuesResult.Unchanged()
-                : FeatureValuesResult.Updated(snapshot);
+                : FeatureValuesResult.Updated(cursor, values);
         }
         catch (JsonException)
         {

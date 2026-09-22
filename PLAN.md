@@ -1112,9 +1112,28 @@ a green light to start coding.
    additionally exposes it as `IFeatureDefinitionsTransport`. Full suite green: 117 + 181 = 298
    passed, 0 warnings — including `RegistrationWorkerTests.cs`, which already exercises the new
    wiring through real `AddTinyFlags` → DI → Kestrel, not mocks.
-3. **Values pull transport.** Add `IFeatureValuesTransport` under `Abstractions/`; promote
-   `FeatureValuesResult`/`FeatureValuesCursor` to public (real naming pass happens here, per open
-   question 2); `TinyFlagsSynchronizationWorker` depends on the interface.
+3. **Values pull transport — implemented and verified 2026-09-22, awaiting review.** Decided
+   between two shapes for the newly-public API (discussed live): keep `FeatureSnapshot` as one
+   type bundling identity and payload, or decompose it. Went with decomposing (option B) —
+   `FeatureSnapshot` is gone entirely, replaced by two public types in `Abstractions/`:
+   `FeatureValuesCursor` (`EnvironmentId`+`Revision` only — identity/staleness, flows in as
+   `current` and back out as `FeatureValuesResult.Cursor`) and `FeatureValuesResult`
+   (`Cursor`+`Values`, `IsUnchanged` when `Cursor` is null). This removed the redundant
+   environment/revision reconciliation the old code did between two overlapping objects on every
+   call. `FeatureSnapshotReader.ReadAsync` now returns an internal `(FeatureValuesCursor, Dictionary)`
+   tuple rather than constructing a type of its own.
+
+   Caught while fixing tests: the old `FeatureSnapshot.Values` was defensively wrapped in
+   `ReadOnlyDictionary`, a tested guarantee (mutation threw `NotSupportedException`). The first cut
+   of `FeatureValuesResult.Updated(...)` just took the dictionary by its read-only interface type
+   without actually enforcing immutability — same class of near-miss as slice 1's ETag prefix, an
+   implicit guarantee almost dropped silently while moving code. Fixed: `Updated(...)` now always
+   copies into a fresh `ReadOnlyDictionary` at construction, so the guarantee holds regardless of
+   what any transport (ours or a future one) passes in. Test restored and re-verified.
+
+   Full suite green (117 + 181 = 298, 0 warnings) and re-verified live against the published
+   `TinyFlags.Server` image via `samples/MultiService` — registered and synchronized 0 → 2 cleanly,
+   no warnings in any container.
 4. **Values push transport + second worker.** Add `IFeatureValuesSubscription`; add the dedicated
    streaming worker that drains it. No concrete implementation ships — HTTP doesn't do push — this
    is contract + worker shape only, dormant until someone implements it.
