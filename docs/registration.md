@@ -1,8 +1,13 @@
 # Registration
 
-Applications declare their flags in code. Registration is how the SDK tells a `TinyFlags.Server`
+Applications declare their flags in code. Registration is how a client tells a `TinyFlags.Server`
 environment which flags exist, so the server can store values for them. It never lets the server
 invent a flag.
+
+This page describes registration transport-agnostically, then shows `TinyFlags.Http`'s wire
+contract as a concrete example. Every transport implements the same
+`IFeatureDefinitionsTransport` contract described in [Building a Transport](building-a-transport.md)
+— `TinyFlags.Grpc`'s `Register` RPC does the same job over a completely different wire format.
 
 ## Catalog composition
 
@@ -26,22 +31,25 @@ work.
 
 ## What the registration worker does
 
-`TinyFlagsRegistrationWorker` runs once per host, after `ApplicationStarted`:
+`TinyFlagsRegistrationWorker` runs once per host, after `ApplicationStarted`, regardless of
+transport:
 
 1. Composes the catalog from every initialized assembly.
-2. Calls `TinyFlagsApiClient.RegisterDefinitionsAsync`.
+2. Calls `IFeatureDefinitionsTransport.RegisterAsync`.
 
-**Transient failures** — network errors, timeouts, 408/429/5xx — retry with backoff through
-`TinyFlagsRetryPolicy`, honoring `Retry-After` on 429/503.
+**Transient failures** — the retryable case for whatever your transport's protocol considers
+retryable — are the transport's own job to absorb before the worker ever sees an outcome.
+`TinyFlags.Http` retries through `TinyFlagsRetryPolicy`, honoring `Retry-After` on 429/503.
 
 **Permanent failures** — rejected credentials, denied access, a definitions conflict, a rejected
-request — stop the worker. The host keeps running; local flag values stay whatever they already
-were.
+request — surface as `TinyFlagsClientException` and stop the worker. The host keeps running; local
+flag values stay whatever they already were.
 
 Registration never touches `FeatureValues` — only
-[the synchronization worker](value-synchronization.md) does.
+[the synchronization worker or the watch worker](value-synchronization.md) does, depending on
+which values contract your transport implements.
 
-## HTTP contract
+## `TinyFlags.Http`'s wire contract
 
 `POST /v1/client/definitions`, authenticated with `Authorization: Bearer <client-api-key>`, scoped
 to the key's environment:

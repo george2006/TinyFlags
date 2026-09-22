@@ -1215,3 +1215,55 @@ a green light to start coding.
    to describe the contracts, mark `TinyFlags.Server` explicitly as "the reference HTTP
    implementation," and add a "build your own transport" guide — the actual deliverable for the
    "we let clever guys do that" goal, since we're shipping seams and docs, not other transports.
+7. **`TinyFlags.Grpc` — implemented, unit-tested, awaiting live verification.** Implements
+   **both** `IFeatureDefinitionsTransport` and `IFeatureValuesSubscription` (revised 2026-09-22 —
+   gRPC must work with no HTTP transport running at all), mirroring `TinyFlags.Http`'s shape:
+   `TinyFlagsGrpcOptions` (`Endpoint`, `ApiKey`, `ReconnectDelay`), `tinyFlags.UseGrpcTransport(...)`
+   extending `TinyFlagsOptions`, registering `TinyFlagsRegistrationWorker` (shared, unchanged) and
+   `TinyFlagsValuesWatchWorker` (the push worker, not the polling one).
+
+   `TinyFlagsGrpcTransport` implements both interfaces against one `GrpcChannel`. `RegisterAsync`
+   is a single call, `RpcException` status codes mapped to `TinyFlagsClientFailure` the same way
+   `TinyFlagsApiClient` maps HTTP statuses (`Unauthenticated`→`CredentialsRejected`,
+   `PermissionDenied`→`AccessDenied`, `AlreadyExists`→`DefinitionsConflict`, etc.). `WatchAsync`
+   reconnects on transient status codes (`Unavailable`/`DeadlineExceeded`/`Internal`/`Aborted`)
+   after `ReconnectDelay`, but lets permanent failures (bad credentials) propagate as
+   `TinyFlagsClientException` so `TinyFlagsValuesWatchWorker` correctly stops instead of retrying
+   forever — reconnection is explicitly this transport's job per the `.proto`'s own contract, not
+   the worker's. `TinyFlagsGrpcOptions.Validate()` mirrors `TinyFlagsHttpOptions`'s exact endpoint
+   rule (HTTPS, or HTTP on loopback only) for the same reason: the Bearer token travels as call
+   metadata, exactly as leakable over plain HTTP to a remote host as an `Authorization` header —
+   caught by a test expecting `file:///flags` to be rejected and finding it wasn't, since
+   `IsAbsoluteUri` alone doesn't reject non-HTTP schemes.
+
+   Unit-tested (options validation/equality, 12 tests, all green) — full suite 314 (25 core + 12
+   gRPC + 117 source-gen + 160 HTTP), one unrelated pre-existing timing flake in
+   `TinyFlags.Http.Tests` confirmed by rerunning it alone.
+
+   **Live verification — done, no Docker, no publishing.** Ran `TinyFlags.Server` directly via
+   `dotnet run` against a throwaway local Postgres container (not `WebApplicationFactory`, not a
+   published image — that step is still explicitly deferred until the server side is reviewed and
+   released for real, per the user's own call). A real `TinyFlagsGrpcTransport` registered a
+   definition and received it pushed back over a real `Watch` stream after a second registration.
+
+   This caught two real bugs neither side's unit/in-memory tests could have: Kestrel's h2c
+   negotiation needing two separate endpoints, not one shared one (see `TinyFlags.Server`'s
+   `PLAN.md`), and `Grpc.Net.Client` silently refusing to even attempt HTTP/2 over plain `http://`
+   without `Http2UnencryptedSupport` explicitly enabled — fixed in `TinyFlagsGrpcTransport`'s
+   constructor, scoped to only the loopback-`http` case `Validate()` already allows. Both sides
+   confirmed clean afterward: 314 tests here (25 core + 12 gRPC + 117 source-gen + 160 HTTP), 200
+   on the server side.
+
+   **Still explicitly deferred, on purpose:** the permanent two-sample setup (HTTP unchanged, a
+   new gRPC sample pulling a published image) needs `TinyFlags.Server`'s gRPC branch reviewed,
+   merged, and released as a real versioned image first — a sample built against unpublished
+   private-repo source would break for anyone who isn't the owner the moment they clone the public
+   client repo. Not something to build ahead of that decision.
+
+   Wire contract: `src/TinyFlags.Grpc/Protos/tinyflags.proto`, two independent services, neither
+   depending on the other existing — `TinyFlagsDefinitions.Register` (unary, one-shot) and
+   `TinyFlagsValues.Watch` (streaming `ValuesSnapshot`, `environment_id` cross-checked on every
+   message the same way `TinyFlagsApiClient` cross-checks its ETag). Full cross-repo plan is in
+   `TinyFlags.Server`'s own `PLAN.md`, including the server-side `LISTEN`/`NOTIFY` mechanism and
+   both gRPC service implementations — already built, tested, and live-verified there via a real
+   `GrpcChannel` against `WebApplicationFactory`'s `TestServer`.

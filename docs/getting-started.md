@@ -81,6 +81,23 @@ This does everything Option A does, plus two independent background workers star
 Neither worker blocks startup or a flag getter. See [Registration](registration.md) and
 [Value Synchronization](value-synchronization.md) for what each one actually does.
 
+### Option C: connect to a server, real-time
+
+Reference [TinyFlags.Grpc](../src/TinyFlags.Grpc) instead of `TinyFlags.Http` for push updates
+instead of polling — same registration worker, but values arrive the moment they change rather
+than on the next interval:
+
+```csharp
+builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseGrpcTransport(options =>
+{
+    options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
+    options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
+}));
+```
+
+Both options implement the same core contracts — see [Building a Transport](building-a-transport.md)
+if you want a third one, for your own protocol or your own server.
+
 ## 4) Read flags
 
 ```csharp
@@ -97,7 +114,9 @@ instance observes updates automatically. No re-resolution needed.
 
 ## 5) Run the server
 
-To try Option B end to end, you need a running server and an issued API key: either
+To try Option B or C end to end, you need a running server and an issued API key: either
 [`TinyFlags.Server`](https://github.com/george2006/TinyFlags.Server), the reference
-implementation, or your own, speaking the same [wire protocol](protocol.md). See the
-[Multi-Service Sample](../samples/MultiService/README.md) for a runnable walkthrough.
+implementation, or your own, speaking the same wire contracts ([HTTP](protocol.md) or
+`tinyflags.proto` for gRPC). See the [Multi-Service Sample](../samples/MultiService/README.md) for
+a runnable walkthrough (HTTP today — a gRPC sample is planned once `TinyFlags.Server`'s gRPC
+support ships as a published image).
