@@ -45,7 +45,7 @@ public sealed class ValuesTransportTests
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var elapsed = Stopwatch.StartNew();
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, ETag, new());
+        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new());
         var result = await sdk.GetValuesAsync([], current, timeout.Token);
 
         Assert.Equal(2, Assert.IsType<FeatureSnapshot>(result.Snapshot).Revision);
@@ -220,7 +220,7 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, ETag,
+        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1,
             new() { ["Existing"] = true });
 
         var result = await client.GetValuesAsync([], current);
@@ -264,7 +264,7 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = hasCurrent ? new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, ETag, new()) : null;
+        var current = hasCurrent ? new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new()) : null;
 
         if (hasCurrent && tagKind == "matching")
         {
@@ -293,7 +293,7 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, ETag, new());
+        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new());
 
         var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => client.GetValuesAsync([], current));
 

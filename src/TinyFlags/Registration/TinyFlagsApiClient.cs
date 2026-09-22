@@ -85,7 +85,10 @@ internal sealed class TinyFlagsApiClient : IDisposable
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
         if (current is not null)
         {
-            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(current.EntityTag));
+            // The protocol fixes this as a weak entity tag (docs/protocol.md); TinyFlags.Server always
+            // sends one, and a client-sent strong tag would fail its weak-comparison expectations.
+            var entityTag = $"W/{FeatureSnapshotEntityTag.Format(current.EnvironmentId, current.Revision)}";
+            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(entityTag));
         }
         return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
     }
