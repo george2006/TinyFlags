@@ -117,6 +117,11 @@ instance observes updates automatically. No re-resolution needed.
 To try Option B or C end to end, you need a running server and an issued API key: either
 [`TinyFlags.Server`](https://github.com/george2006/TinyFlags.Server), the reference
 implementation, or your own, speaking the same wire contracts ([HTTP](protocol.md) or
-`tinyflags.proto` for gRPC). See the [Multi-Service HTTP Sample](../samples/MultiServiceHttp/README.md) for
-a runnable walkthrough (HTTP today — a gRPC sample is planned once `TinyFlags.Server`'s gRPC
-support ships as a published image).
+`tinyflags.proto` for gRPC). Three runnable samples, each a minimal Docker Compose stack:
+
+- [Single-Service HTTP Sample](../samples/SingleServiceHttp/README.md) — this Option B code,
+  actually running
+- [Single-Service gRPC Sample](../samples/SingleServiceGrpc/README.md) — this Option C code,
+  actually running
+- [Multi-Service HTTP Sample](../samples/MultiServiceHttp/README.md) — two services sharing one
+  flag identity over HTTP

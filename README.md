@@ -124,6 +124,8 @@ and authentication.
 - [Server Protocol (HTTP)](docs/protocol.md)
 - [Building a Transport](docs/building-a-transport.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
+- [Single-Service HTTP Sample](samples/SingleServiceHttp/README.md) — one service, one flag, polling over HTTP
+- [Single-Service gRPC Sample](samples/SingleServiceGrpc/README.md) — one service, one flag, real-time push over gRPC
 - [Multi-Service HTTP Sample](samples/MultiServiceHttp/README.md) — a runnable walkthrough, two services and a Dockerized server
 - [Diagnostics](docs/diagnostics.md)
 - [Tiny suite](docs/tiny-suite.md)
