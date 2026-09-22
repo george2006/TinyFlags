@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/TinyFlags/TinyFlags.csproj" />
+    <ProjectReference Include="../../src/TinyFlags.Http/TinyFlags.Http.csproj" />
+    <ProjectReference Include="../../src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>
