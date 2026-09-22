@@ -1104,11 +1104,14 @@ a green light to start coding.
    *content* only (the framework already strips `W/` there), the outgoing request always adds
    `W/` explicitly and unconditionally, matching the documented format rather than echoing
    whatever was last received. Full suite green: 117 + 181 = 298 passed, 0 warnings.
-2. **Registration transport.** Add `IFeatureDefinitionsTransport` under `Abstractions/`; have
-   `TinyFlagsApiClient`'s registration path implement it; `TinyFlagsRegistrationWorker` depends on
-   the interface, not the concrete class; DI still resolves the HTTP implementation by default.
-   Smallest of the three contracts (no cursor, no result type) — proves the pattern before the
-   more complex values side.
+2. **Registration transport — implemented and verified 2026-09-22, awaiting review.** Added
+   `IFeatureDefinitionsTransport` under `Abstractions/` (one method, `RegisterAsync`).
+   `TinyFlagsApiClient` implements it (`RegisterDefinitionsAsync` renamed to `RegisterAsync` to
+   match). `TinyFlagsRegistrationWorker` now depends on the interface, not the concrete class. DI
+   keeps the one `TinyFlagsApiClient` singleton (still needed by the untouched values side) and
+   additionally exposes it as `IFeatureDefinitionsTransport`. Full suite green: 117 + 181 = 298
+   passed, 0 warnings — including `RegistrationWorkerTests.cs`, which already exercises the new
+   wiring through real `AddTinyFlags` → DI → Kestrel, not mocks.
 3. **Values pull transport.** Add `IFeatureValuesTransport` under `Abstractions/`; promote
    `FeatureValuesResult`/`FeatureValuesCursor` to public (real naming pass happens here, per open
    question 2); `TinyFlagsSynchronizationWorker` depends on the interface.
