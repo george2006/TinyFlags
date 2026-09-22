@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY src/TinyFlags/ src/TinyFlags/
+COPY src/TinyFlags.Http/ src/TinyFlags.Http/
 COPY src/TinyFlags.SourceGen/ src/TinyFlags.SourceGen/
 COPY samples/MultiService/PaymentsService/ samples/MultiService/PaymentsService/
 RUN dotnet publish samples/MultiService/PaymentsService/PaymentsService.csproj -c Release -o /app

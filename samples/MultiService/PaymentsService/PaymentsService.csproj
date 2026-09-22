@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../src/TinyFlags/TinyFlags.csproj" />
+    <ProjectReference Include="../../../src/TinyFlags.Http/TinyFlags.Http.csproj" />
     <ProjectReference Include="../../../src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

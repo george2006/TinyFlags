@@ -1,26 +1,26 @@
 namespace TinyFlags.Tests;
 
-public sealed class TinyFlagsClientOptionsTests
+public sealed class TinyFlagsHttpOptionsTests
 {
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void Invalid_snapshot_limit_is_rejected_before_startup(int bytes)
     {
-        var options = new TinyFlagsClientOptions
+        var options = new TinyFlagsHttpOptions
         {
             Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key", MaxSnapshotBytes = bytes
         };
 
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => options.CreateSnapshot());
 
-        Assert.Equal(nameof(TinyFlagsClientOptions.MaxSnapshotBytes), error.ParamName);
+        Assert.Equal(nameof(TinyFlagsHttpOptions.MaxSnapshotBytes), error.ParamName);
     }
 
     [Fact]
     public void Snapshot_limit_is_copied_and_participates_in_configuration_equality()
     {
-        var options = new TinyFlagsClientOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key" };
+        var options = new TinyFlagsHttpOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key" };
         Assert.Equal(8 * 1024 * 1024, options.MaxSnapshotBytes);
         options.MaxSnapshotBytes = 1024;
         var snapshot = options.CreateSnapshot();
@@ -40,7 +40,7 @@ public sealed class TinyFlagsClientOptionsTests
     [InlineData(1000, 2147483648L)]
     public void Invalid_retry_settings_are_rejected_before_startup(long initial, long maximum)
     {
-        var options = new TinyFlagsClientOptions
+        var options = new TinyFlagsHttpOptions
         {
             Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key",
             RetryDelay = TimeSpan.FromMilliseconds(initial), MaxRetryDelay = TimeSpan.FromMilliseconds(maximum)
@@ -55,7 +55,7 @@ public sealed class TinyFlagsClientOptionsTests
     [InlineData(2147483648L)]
     public void Invalid_refresh_interval_is_rejected_before_startup(long milliseconds)
     {
-        var options = new TinyFlagsClientOptions
+        var options = new TinyFlagsHttpOptions
         {
             Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key",
             RefreshInterval = TimeSpan.FromMilliseconds(milliseconds)
@@ -63,7 +63,7 @@ public sealed class TinyFlagsClientOptionsTests
 
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => options.CreateSnapshot());
 
-        Assert.Equal(nameof(TinyFlagsClientOptions.RefreshInterval), error.ParamName);
+        Assert.Equal(nameof(TinyFlagsHttpOptions.RefreshInterval), error.ParamName);
     }
 
     [Theory]
@@ -77,7 +77,7 @@ public sealed class TinyFlagsClientOptionsTests
     public void Invalid_endpoint_is_rejected_before_any_request(string? endpoint)
     {
         using var http = new HttpClient();
-        var options = new TinyFlagsClientOptions
+        var options = new TinyFlagsHttpOptions
         {
             Endpoint = endpoint is null ? null : new Uri(endpoint, UriKind.RelativeOrAbsolute),
             ApiKey = "test-key"
@@ -85,7 +85,7 @@ public sealed class TinyFlagsClientOptionsTests
 
         var error = Assert.Throws<ArgumentException>(() => CreateClient(http, options));
 
-        Assert.Equal(nameof(TinyFlagsClientOptions.Endpoint), error.ParamName);
+        Assert.Equal(nameof(TinyFlagsHttpOptions.Endpoint), error.ParamName);
     }
 
     [Theory]
@@ -99,11 +99,11 @@ public sealed class TinyFlagsClientOptionsTests
     public void Invalid_credential_is_rejected_without_echoing_it(string? key)
     {
         using var http = new HttpClient();
-        var options = new TinyFlagsClientOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = key };
+        var options = new TinyFlagsHttpOptions { Endpoint = new Uri("https://flags.example.com"), ApiKey = key };
 
         var error = Assert.Throws<ArgumentException>(() => CreateClient(http, options));
 
-        Assert.Equal(nameof(TinyFlagsClientOptions.ApiKey), error.ParamName);
+        Assert.Equal(nameof(TinyFlagsHttpOptions.ApiKey), error.ParamName);
         if (!string.IsNullOrWhiteSpace(key))
         {
             Assert.DoesNotContain(key, error.Message);
@@ -117,7 +117,7 @@ public sealed class TinyFlagsClientOptionsTests
     public void Invalid_timeout_is_rejected_before_any_request(long milliseconds)
     {
         using var http = new HttpClient();
-        var options = new TinyFlagsClientOptions
+        var options = new TinyFlagsHttpOptions
         {
             Endpoint = new Uri("https://flags.example.com"), ApiKey = "test-key",
             RequestTimeout = TimeSpan.FromMilliseconds(milliseconds)
@@ -125,8 +125,8 @@ public sealed class TinyFlagsClientOptionsTests
 
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => CreateClient(http, options));
 
-        Assert.Equal(nameof(TinyFlagsClientOptions.RequestTimeout), error.ParamName);
+        Assert.Equal(nameof(TinyFlagsHttpOptions.RequestTimeout), error.ParamName);
     }
-    private static TinyFlagsApiClient CreateClient(HttpClient http, TinyFlagsClientOptions options)
+    private static TinyFlagsApiClient CreateClient(HttpClient http, TinyFlagsHttpOptions options)
         => new(http, options, new FeatureSnapshotReader(options.MaxSnapshotBytes));
 }

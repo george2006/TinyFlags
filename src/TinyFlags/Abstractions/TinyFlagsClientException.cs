@@ -2,7 +2,7 @@ using System;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsClientException : Exception
+public sealed class TinyFlagsClientException : Exception
 {
     public TinyFlagsClientFailure Failure { get; }
 

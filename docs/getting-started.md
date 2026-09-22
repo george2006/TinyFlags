@@ -58,8 +58,12 @@ defaults unless something else calls `FeatureValues.ReplaceSnapshot` directly.
 
 ### Option B: Connect to a server
 
+Also reference the [TinyFlags.Http](../src/TinyFlags.Http) package — the reference transport, one
+implementation of the transport contracts (`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`)
+in the core package's `Abstractions/` folder:
+
 ```csharp
-builder.Services.AddTinyFlags(options =>
+builder.Services.UseHttpTransport(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
     options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];

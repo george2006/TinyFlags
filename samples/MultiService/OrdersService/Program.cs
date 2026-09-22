@@ -3,7 +3,7 @@ using Shared;
 using TinyFlags;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddTinyFlags(options =>
+builder.Services.UseHttpTransport(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]
         ?? throw new InvalidOperationException("TinyFlags:Endpoint is required."));

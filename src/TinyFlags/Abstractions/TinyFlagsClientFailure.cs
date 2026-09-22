@@ -1,6 +1,6 @@
 namespace TinyFlags;
 
-internal enum TinyFlagsClientFailure
+public enum TinyFlagsClientFailure
 {
     CredentialsRejected,
     AccessDenied,

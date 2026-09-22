@@ -23,17 +23,17 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatur
 
     private readonly HttpClient httpClient;
     private readonly bool ownsHttpClient;
-    private readonly TinyFlagsClientOptions options;
+    private readonly TinyFlagsHttpOptions options;
     private readonly Uri registrationEndpoint;
     private readonly Uri valuesEndpoint;
     private readonly TinyFlagsRetryPolicy retry;
     private readonly FeatureSnapshotReader snapshotReader;
     private readonly ILogger logger;
 
-    public TinyFlagsApiClient(TinyFlagsClientOptions options, FeatureSnapshotReader snapshotReader, ILogger? logger = null)
+    public TinyFlagsApiClient(TinyFlagsHttpOptions options, FeatureSnapshotReader snapshotReader, ILogger? logger = null)
         : this(CreateHttpClient(options, snapshotReader), options, snapshotReader, logger) => ownsHttpClient = true;
 
-    public TinyFlagsApiClient(HttpClient httpClient, TinyFlagsClientOptions options,
+    public TinyFlagsApiClient(HttpClient httpClient, TinyFlagsHttpOptions options,
         FeatureSnapshotReader snapshotReader, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
@@ -157,7 +157,7 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatur
         return snapshot;
     }
 
-    private static HttpClient CreateHttpClient(TinyFlagsClientOptions options, FeatureSnapshotReader snapshotReader)
+    private static HttpClient CreateHttpClient(TinyFlagsHttpOptions options, FeatureSnapshotReader snapshotReader)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(snapshotReader);

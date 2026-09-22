@@ -28,7 +28,7 @@ public sealed partial class RegistrationWorkerTests
         });
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.ConfigureKestrel(kestrel => kestrel.Listen(IPAddress.Loopback, 0));
-        builder.Services.AddTinyFlags(options => Configure(options, server));
+        builder.Services.UseHttpTransport(options => Configure(options, server));
         await using var app = builder.Build();
         app.MapGet("/defaults", (StartupFeatureFlags flags) => new { flags.Enabled, flags.Label });
         var worker = GetWorker(app.Services);
@@ -80,8 +80,8 @@ public sealed partial class RegistrationWorkerTests
         values.ReplaceSnapshot(new Dictionary<string, object> { ["TinyFlags.Tests.Startup.Enabled"] = true });
         builder.Services.AddSingleton(values);
         builder.Services.AddTinyFlags();
-        TinyFlagsClientOptions? captured = null;
-        builder.Services.AddTinyFlags(options =>
+        TinyFlagsHttpOptions? captured = null;
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             captured = options;
@@ -89,7 +89,7 @@ public sealed partial class RegistrationWorkerTests
         captured!.ApiKey = "mutated-key";
         captured.Endpoint = new Uri("https://wrong.example.com");
         captured.RequestTimeout = TimeSpan.Zero;
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.Endpoint = new Uri(options.Endpoint!.AbsoluteUri.TrimEnd('/') + "/");
@@ -115,13 +115,13 @@ public sealed partial class RegistrationWorkerTests
     public void Conflicting_configuration_is_rejected_without_changing_the_original_settings(string difference)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             options.Endpoint = new Uri("https://flags.example.com/base");
             options.ApiKey = "original-secret";
         });
 
-        var error = Assert.Throws<InvalidOperationException>(() => builder.Services.AddTinyFlags(options =>
+        var error = Assert.Throws<InvalidOperationException>(() => builder.Services.UseHttpTransport(options =>
         {
             options.Endpoint = new Uri(difference == "endpoint" ? "https://other.example.com" : "https://flags.example.com/base/");
             options.ApiKey = difference == "key" ? "other-secret" : "original-secret";
@@ -133,7 +133,7 @@ public sealed partial class RegistrationWorkerTests
         Assert.DoesNotContain("original-secret", error.Message);
         Assert.DoesNotContain("other-secret", error.Message);
         using var host = builder.Build();
-        var settings = host.Services.GetRequiredService<TinyFlagsClientOptions>();
+        var settings = host.Services.GetRequiredService<TinyFlagsHttpOptions>();
         Assert.Equal(new Uri("https://flags.example.com/base/"), settings.Endpoint);
         Assert.Equal("original-secret", settings.ApiKey);
         Assert.Equal(TimeSpan.FromSeconds(30), settings.RequestTimeout);
@@ -144,7 +144,7 @@ public sealed partial class RegistrationWorkerTests
     public async Task Invalid_configuration_is_rejected_during_setup_and_local_only_registration_still_works()
     {
         var builder = Host.CreateApplicationBuilder();
-        Assert.Throws<ArgumentException>(() => builder.Services.AddTinyFlags(options =>
+        Assert.Throws<ArgumentException>(() => builder.Services.UseHttpTransport(options =>
         {
             options.Endpoint = new Uri("http://remote.example.com");
             options.ApiKey = "test-key";
@@ -172,7 +172,7 @@ public sealed partial class RegistrationWorkerTests
             return Task.CompletedTask;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options => Configure(options, server));
+        builder.Services.UseHttpTransport(options => Configure(options, server));
         using var host = builder.Build();
         var worker = GetWorker(host.Services);
 
@@ -199,7 +199,7 @@ public sealed partial class RegistrationWorkerTests
             await Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted);
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options => Configure(options, server));
+        builder.Services.UseHttpTransport(options => Configure(options, server));
         using var host = builder.Build();
         await host.StartAsync(timeout.Token);
         await received.Task.WaitAsync(timeout.Token);
@@ -232,7 +232,7 @@ public sealed partial class RegistrationWorkerTests
             return Task.CompletedTask;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options => Configure(options, server));
+        builder.Services.UseHttpTransport(options => Configure(options, server));
         using var host = builder.Build();
 
         await host.StartAsync(timeout.Token);
@@ -270,7 +270,7 @@ public sealed partial class RegistrationWorkerTests
             }
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RequestTimeout = TimeSpan.FromSeconds(2);
@@ -291,7 +291,7 @@ public sealed partial class RegistrationWorkerTests
     private static TinyFlagsRegistrationWorker GetWorker(IServiceProvider services)
         => Assert.Single(services.GetServices<IHostedService>().OfType<TinyFlagsRegistrationWorker>());
 
-    private static void Configure(TinyFlagsClientOptions options, WebApplication server)
+    private static void Configure(TinyFlagsHttpOptions options, WebApplication server)
     {
         options.Endpoint = new Uri(server.Urls.Single());
         options.ApiKey = "test-key";

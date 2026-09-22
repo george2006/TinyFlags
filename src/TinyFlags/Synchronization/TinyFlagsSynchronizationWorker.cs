@@ -6,16 +6,16 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsSynchronizationWorker : BackgroundService
+public sealed class TinyFlagsSynchronizationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly IFeatureValuesTransport transport;
     private readonly FeatureValues values;
-    private readonly TinyFlagsClientOptions options;
+    private readonly FeatureValuesPollingOptions options;
     private readonly IHostApplicationLifetime lifetime;
     private readonly ILogger<TinyFlagsSynchronizationWorker> logger;
 
-    public TinyFlagsSynchronizationWorker(IFeatureValuesTransport transport, FeatureValues values, TinyFlagsClientOptions options,
+    public TinyFlagsSynchronizationWorker(IFeatureValuesTransport transport, FeatureValues values, FeatureValuesPollingOptions options,
         IHostApplicationLifetime lifetime, ILogger<TinyFlagsSynchronizationWorker> logger)
     {
         this.transport = transport;
