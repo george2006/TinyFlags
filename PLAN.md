@@ -1215,21 +1215,42 @@ a green light to start coding.
    to describe the contracts, mark `TinyFlags.Server` explicitly as "the reference HTTP
    implementation," and add a "build your own transport" guide — the actual deliverable for the
    "we let clever guys do that" goal, since we're shipping seams and docs, not other transports.
-7. **`TinyFlags.Grpc` — not started.** Revised 2026-09-22: gRPC must be a fully independent
-   transport, not one that leans on HTTP for registration — explicitly confirmed after an initial
-   cut only covered `IFeatureValuesSubscription`. A server running gRPC alone, no HTTP transport
-   at all, must be able to do everything a TinyFlags server needs to do. So `TinyFlags.Grpc`
-   implements **both** `IFeatureDefinitionsTransport` and `IFeatureValuesSubscription`, mirroring
-   `TinyFlags.Http`'s shape (own options type, `tinyFlags.UseGrpcTransport(...)` extending
-   `TinyFlagsOptions`). Blocked on the `TinyFlags.Server` side existing first — needs a real
-   server to test against, same discipline every other slice tonight used.
+7. **`TinyFlags.Grpc` — implemented, unit-tested, awaiting live verification.** Implements
+   **both** `IFeatureDefinitionsTransport` and `IFeatureValuesSubscription` (revised 2026-09-22 —
+   gRPC must work with no HTTP transport running at all), mirroring `TinyFlags.Http`'s shape:
+   `TinyFlagsGrpcOptions` (`Endpoint`, `ApiKey`, `ReconnectDelay`), `tinyFlags.UseGrpcTransport(...)`
+   extending `TinyFlagsOptions`, registering `TinyFlagsRegistrationWorker` (shared, unchanged) and
+   `TinyFlagsValuesWatchWorker` (the push worker, not the polling one).
 
-   Wire contract settled 2026-09-22, revised same day: `src/TinyFlags.Grpc/Protos/tinyflags.proto`
-   (project itself not scaffolded yet, just the `.proto`) now has **two** independent services,
-   neither depending on the other existing — `TinyFlagsDefinitions.Register` (unary, one-shot,
-   same reasoning as `IFeatureDefinitionsTransport` itself: nothing to pull or push about
-   registration) and `TinyFlagsValues.Watch` (streaming, returning `ValuesSnapshot` with
-   `environment_id`/`revision`/`values`, `environment_id` cross-checked on every message the same
-   way `TinyFlagsApiClient` already cross-checks its ETag). Full cross-repo plan, including the
-   server-side `LISTEN`/`NOTIFY` mechanism and the two gRPC service implementations, is in
-   `TinyFlags.Server`'s own `PLAN.md`.
+   `TinyFlagsGrpcTransport` implements both interfaces against one `GrpcChannel`. `RegisterAsync`
+   is a single call, `RpcException` status codes mapped to `TinyFlagsClientFailure` the same way
+   `TinyFlagsApiClient` maps HTTP statuses (`Unauthenticated`→`CredentialsRejected`,
+   `PermissionDenied`→`AccessDenied`, `AlreadyExists`→`DefinitionsConflict`, etc.). `WatchAsync`
+   reconnects on transient status codes (`Unavailable`/`DeadlineExceeded`/`Internal`/`Aborted`)
+   after `ReconnectDelay`, but lets permanent failures (bad credentials) propagate as
+   `TinyFlagsClientException` so `TinyFlagsValuesWatchWorker` correctly stops instead of retrying
+   forever — reconnection is explicitly this transport's job per the `.proto`'s own contract, not
+   the worker's. `TinyFlagsGrpcOptions.Validate()` mirrors `TinyFlagsHttpOptions`'s exact endpoint
+   rule (HTTPS, or HTTP on loopback only) for the same reason: the Bearer token travels as call
+   metadata, exactly as leakable over plain HTTP to a remote host as an `Authorization` header —
+   caught by a test expecting `file:///flags` to be rejected and finding it wasn't, since
+   `IsAbsoluteUri` alone doesn't reject non-HTTP schemes.
+
+   Unit-tested (options validation/equality, 12 tests, all green) — full suite 314 (25 core + 12
+   gRPC + 117 source-gen + 160 HTTP), one unrelated pre-existing timing flake in
+   `TinyFlags.Http.Tests` confirmed by rerunning it alone.
+
+   **Not yet done: live verification against a real running server.** Every other transport
+   tonight was proven against the real thing, not just unit tests — `TinyFlags.Http` via
+   `samples/MultiService`'s docker-compose against the published server image.
+   `TinyFlags.Server`'s gRPC support was only just built tonight and isn't in any published image
+   yet, so this needs either a fresh local image build or a new/extended sample. Explicitly the
+   next thing to decide, not silently skipped.
+
+   Wire contract: `src/TinyFlags.Grpc/Protos/tinyflags.proto`, two independent services, neither
+   depending on the other existing — `TinyFlagsDefinitions.Register` (unary, one-shot) and
+   `TinyFlagsValues.Watch` (streaming `ValuesSnapshot`, `environment_id` cross-checked on every
+   message the same way `TinyFlagsApiClient` cross-checks its ETag). Full cross-repo plan is in
+   `TinyFlags.Server`'s own `PLAN.md`, including the server-side `LISTEN`/`NOTIFY` mechanism and
+   both gRPC service implementations — already built, tested, and live-verified there via a real
+   `GrpcChannel` against `WebApplicationFactory`'s `TestServer`.
