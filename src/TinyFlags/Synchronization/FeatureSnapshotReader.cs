@@ -21,7 +21,7 @@ internal sealed class FeatureSnapshotReader
         this.maxSnapshotBytes = maxSnapshotBytes;
     }
 
-    public async Task<FeatureSnapshot> ReadAsync(HttpResponseMessage response,
+    public async Task<(FeatureValuesCursor Cursor, Dictionary<string, object> Values)> ReadAsync(HttpResponseMessage response,
         IReadOnlyList<FeatureDefinition> catalog, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(response);
@@ -44,10 +44,10 @@ internal sealed class FeatureSnapshotReader
         var environmentId = ReadEnvironmentId(response, revision);
         var values = ReadValues(root, catalog, ct);
         ct.ThrowIfCancellationRequested();
-        return new FeatureSnapshot(environmentId, revision, values);
+        return (new FeatureValuesCursor(environmentId, revision), values);
     }
 
-    public void ValidateUnchanged(HttpResponseMessage response, FeatureSnapshot? current)
+    public void ValidateUnchanged(HttpResponseMessage response, FeatureValuesCursor? current)
     {
         if (current is null)
         {

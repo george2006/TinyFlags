@@ -45,10 +45,10 @@ public sealed class ValuesTransportTests
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var elapsed = Stopwatch.StartNew();
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new());
+        var current = new FeatureValuesCursor(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1);
         var result = await sdk.GetValuesAsync([], current, timeout.Token);
 
-        Assert.Equal(2, Assert.IsType<FeatureSnapshot>(result.Snapshot).Revision);
+        Assert.Equal(2, result.Cursor!.Revision);
         Assert.True(elapsed.Elapsed >= TimeSpan.FromMilliseconds(900));
         Assert.Equal(2, requests);
         Assert.Equal("Bearer test-key", authorization);
@@ -91,8 +91,9 @@ public sealed class ValuesTransportTests
         }
 
         var result = await sdk.GetValuesAsync([]);
-        var snapshot = Assert.IsType<FeatureSnapshot>(result.Snapshot);
-        Assert.Equal(value, snapshot.Values["Label"]);
+        Assert.Equal(value, result.Values!["Label"]);
+        var dictionary = Assert.IsAssignableFrom<IDictionary<string, object>>(result.Values);
+        Assert.Throws<NotSupportedException>(() => dictionary.Add("Mutation", true));
     }
 
     [Theory]
@@ -146,7 +147,7 @@ public sealed class ValuesTransportTests
         Assert.Equal(source == "caller", cancellation.IsCancellationRequested);
         await disconnected.Task.WaitAsync(testTimeout.Token);
 
-        Assert.Empty(Assert.IsType<FeatureSnapshot>(recovered.Snapshot).Values);
+        Assert.Empty(recovered.Values!);
         Assert.Equal(2, requests);
     }
 
@@ -199,7 +200,7 @@ public sealed class ValuesTransportTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var result = await sdk.GetValuesAsync([], ct: timeout.Token);
 
-        Assert.Empty(Assert.IsType<FeatureSnapshot>(result.Snapshot).Values);
+        Assert.Empty(result.Values!);
         Assert.Equal(2, requests);
     }
 
@@ -220,21 +221,19 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1,
-            new() { ["Existing"] = true });
+        var current = new FeatureValuesCursor(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1);
 
         var result = await client.GetValuesAsync([], current);
 
         Assert.Equal(serverRevision <= current.Revision, result.IsUnchanged);
         if (serverRevision > current.Revision)
         {
-            Assert.Equal(serverRevision, Assert.IsType<FeatureSnapshot>(result.Snapshot).Revision);
+            Assert.Equal(serverRevision, result.Cursor!.Revision);
         }
         else
         {
-            Assert.Null(result.Snapshot);
+            Assert.Null(result.Cursor);
         }
-        Assert.True(Assert.IsType<bool>(current.Values["Existing"]));
     }
 
     [Theory]
@@ -264,13 +263,13 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = hasCurrent ? new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new()) : null;
+        var current = hasCurrent ? new FeatureValuesCursor(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1) : null;
 
         if (hasCurrent && tagKind == "matching")
         {
             var result = await client.GetValuesAsync([], current);
             Assert.True(result.IsUnchanged);
-            Assert.Null(result.Snapshot);
+            Assert.Null(result.Cursor);
         }
         else
         {
@@ -293,7 +292,7 @@ public sealed class ValuesTransportTests
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
-        var current = new FeatureSnapshot(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1, new());
+        var current = new FeatureValuesCursor(Guid.Parse("550e8400-e29b-41d4-a716-446655440000"), 1);
 
         var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => client.GetValuesAsync([], current));
 
