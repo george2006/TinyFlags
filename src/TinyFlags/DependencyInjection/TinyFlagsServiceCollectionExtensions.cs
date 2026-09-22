@@ -44,6 +44,7 @@ public static class TinyFlagsServiceCollectionExtensions
             services.AddSingleton(new FeatureSnapshotReader(snapshot.MaxSnapshotBytes));
             services.AddSingleton(provider => new TinyFlagsApiClient(snapshot,
                 provider.GetRequiredService<FeatureSnapshotReader>(), provider.GetRequiredService<ILogger<TinyFlagsApiClient>>()));
+            services.TryAddSingleton<IFeatureDefinitionsTransport>(provider => provider.GetRequiredService<TinyFlagsApiClient>());
         }
         services.AddHostedService<TinyFlagsRegistrationWorker>();
         services.AddHostedService<TinyFlagsSynchronizationWorker>();

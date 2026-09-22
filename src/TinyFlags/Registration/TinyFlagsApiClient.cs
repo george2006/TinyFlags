@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsApiClient : IDisposable
+internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -48,7 +48,7 @@ internal sealed class TinyFlagsApiClient : IDisposable
         this.logger = logger ?? NullLogger.Instance;
     }
 
-    public async Task RegisterDefinitionsAsync(IReadOnlyList<FeatureDefinition> definitions, CancellationToken ct = default)
+    public async Task RegisterAsync(IReadOnlyList<FeatureDefinition> definitions, CancellationToken ct = default)
     {
         var catalog = CopyCatalog(definitions);
         await retry.ExecuteAsync(token => SendRegistrationAsync(catalog, token),

@@ -9,14 +9,14 @@ namespace TinyFlags;
 internal sealed class TinyFlagsRegistrationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TinyFlagsApiClient client;
+    private readonly IFeatureDefinitionsTransport transport;
     private readonly IHostApplicationLifetime lifetime;
     private readonly ILogger<TinyFlagsRegistrationWorker> logger;
 
-    public TinyFlagsRegistrationWorker(TinyFlagsApiClient client, IHostApplicationLifetime lifetime,
+    public TinyFlagsRegistrationWorker(IFeatureDefinitionsTransport transport, IHostApplicationLifetime lifetime,
         ILogger<TinyFlagsRegistrationWorker> logger)
     {
-        this.client = client;
+        this.transport = transport;
         this.lifetime = lifetime;
         this.logger = logger;
     }
@@ -49,7 +49,7 @@ internal sealed class TinyFlagsRegistrationWorker : BackgroundService
     private async Task RegisterDefinitionsAsync(CancellationToken ct)
     {
         var definitions = TinyFlagsBootstrap.GetDefinitions();
-        await client.RegisterDefinitionsAsync(definitions, ct).ConfigureAwait(false);
+        await transport.RegisterAsync(definitions, ct).ConfigureAwait(false);
         logger.LogInformation("TinyFlags definitions registered.");
     }
 }
