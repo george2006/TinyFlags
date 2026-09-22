@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsRegistrationWorker : BackgroundService
+public sealed class TinyFlagsRegistrationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly IFeatureDefinitionsTransport transport;

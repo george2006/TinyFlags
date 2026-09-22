@@ -1057,15 +1057,47 @@ just `EnvironmentId` + `Revision`, no `EntityTag`.
 
 ### Open questions for the user to mark up
 
-1. **Packaging — decided 2026-09-22.** Stays inside core `TinyFlags`, no separate NuGet, matching
-   the `TinyEvents` precedent. The three contracts live under `src/TinyFlags/Abstractions/`,
-   matching `TinyEvents`'s own `Abstractions/` folder convention
-   (`ITinyEventPublisher.cs`/`IEventConsumer.cs`) — `IFeatureDefinitionsTransport.cs`,
-   `IFeatureValuesTransport.cs`, `IFeatureValuesSubscription.cs`. `FeatureValuesCursor` moves there
-   too, since it appears directly in the public interface signatures. The HTTP implementation
-   (today's `TinyFlagsApiClient`/`TinyFlagsRetryPolicy`/`FeatureSnapshotReader`) stays where it is,
-   under `Registration/`/`Synchronization/`, just implementing the new interfaces instead of being
-   the only option.
+1. **Packaging — revised 2026-09-22, now shipped.** Originally decided to keep HTTP in core
+   (matching `TinyEvents`: separate packages only for implementations with a heavy external
+   dependency, and `HttpClient` needs none). Superseded same day by a different, equally valid
+   rationale once the actual goal was named explicitly: HTTP is meant to be *the worked example* of
+   how to build a transport, symmetric with a future `TinyFlags.Grpc` sample (HTTP → the pull
+   interfaces, gRPC → push/`IFeatureValuesSubscription`, real-time). Leaving HTTP specially wired
+   into core while gRPC lived outside would make HTTP look privileged instead of like the first
+   example. Extracted into `TinyFlags.Http` — implemented, verified, committed.
+
+   What actually moved: `TinyFlagsApiClient`, `TinyFlagsRetryPolicy`, `FeatureSnapshotReader`,
+   `FeatureSnapshotEntityTag`, and `TinyFlagsClientOptions` (renamed `TinyFlagsHttpOptions` — it's
+   HTTP-shaped, a gRPC channel has none of `Endpoint`/`ApiKey`/retry settings). What stayed in core,
+   confirmed necessary while splitting: the three transport contracts and cursor/result types (as
+   before); the two workers (`TinyFlagsRegistrationWorker`, `TinyFlagsSynchronizationWorker`) since
+   they're pure logic against an interface, not HTTP-specific; `TinyFlagsClientException`/
+   `TinyFlagsClientFailure`, which had to go from `internal` to public once thrown from one
+   assembly and caught in another — `InternalsVisibleTo` would only work for packages we
+   explicitly allowlist, defeating "let anyone build a transport." Same reasoning forced the two
+   workers from `internal` to `public` — `UseHttpTransport` needs to call `AddHostedService<T>()`
+   on them from a different assembly.
+
+   One real design fork resolved along the way: `TinyFlagsSynchronizationWorker` only used
+   `RefreshInterval` from the HTTP options — genuinely transport-agnostic (every pull transport
+   needs a poll interval; push transports need none), so it couldn't stay coupled to HTTP-only
+   options once split. Extracted to `FeatureValuesPollingOptions` in core; `UseHttpTransport`
+   still exposes `RefreshInterval` as a convenience property on `TinyFlagsHttpOptions` and
+   translates it internally, so the configuration experience is unchanged even though the actual
+   dependency moved.
+
+   New project layout: `src/TinyFlags.Http` (implementation), `tests/TinyFlags.Http.Tests`
+   (mirroring the `TinyEvents.PostgreSql.AdoNet.Tests`-style per-package split — confirmed as
+   precedent before doing it). `tests/TinyFlags.Tests` now only holds transport-agnostic tests
+   (`FeatureDefinitionTests`, `FeatureValuesTests`); everything HTTP-shaped moved with the code.
+   All 298 tests still pass, split 21/117/160 across the three test projects, zero lost or
+   duplicated. Samples (`OrdersService`, `PaymentsService`) updated: new `ProjectReference`, their
+   Dockerfiles needed an added `COPY src/TinyFlags.Http/` line (caught by a real Docker build
+   failure, not guessed), `AddTinyFlags(configure)` calls became `UseHttpTransport(configure)`.
+   Re-verified live against the published `TinyFlags.Server` image after the split, same healthy
+   signature as every other slice tonight. `README.md`/`docs/getting-started.md` code samples
+   fixed since they'd otherwise not compile (`AddTinyFlags(options => ...)` no longer exists) —
+   the fuller docs pass explaining the transport model itself is still slice 6, not done here.
 2. **API surface consequence** — `FeatureSnapshot`/`FeatureValuesResult` are `internal` today.
    Once an external package implements these interfaces and returns these types, they're
    permanent public API with real naming/versioning stakes, not private plumbing anymore.

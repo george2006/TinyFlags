@@ -23,7 +23,7 @@ public sealed partial class RegistrationWorkerTests
             await context.Response.WriteAsync("response body", context.RequestAborted);
         });
         using var http = new HttpClient();
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions
         {
             RetryDelay = TimeSpan.FromMilliseconds(10), MaxRetryDelay = TimeSpan.FromMilliseconds(20)
         });
@@ -75,7 +75,7 @@ public sealed partial class RegistrationWorkerTests
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMilliseconds(20);
@@ -125,7 +125,7 @@ public sealed partial class RegistrationWorkerTests
             return Task.CompletedTask;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMilliseconds(10);
@@ -165,7 +165,7 @@ public sealed partial class RegistrationWorkerTests
             });
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddTinyFlags(options =>
+        builder.Services.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMinutes(1);

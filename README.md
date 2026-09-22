@@ -29,6 +29,10 @@ locally:
 ```bash
 dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
 dotnet add package TinyFlags --source artifacts/packages
+
+# Only if you want the reference HTTP transport (talking to TinyFlags.Server or your own):
+dotnet pack src/TinyFlags.Http/TinyFlags.Http.csproj -c Release -o artifacts/packages
+dotnet add package TinyFlags.Http --source artifacts/packages
 ```
 
 ## Quick start
@@ -62,10 +66,11 @@ bool enabled = flags.NuevoCheckout; // false, the declared default
 ```
 
 That is local-only: flags read their declared defaults, with no network calls. To connect to a
-`TinyFlags.Server` environment and receive centrally managed values:
+`TinyFlags.Server` environment and receive centrally managed values, also reference the
+[TinyFlags.Http](src/TinyFlags.Http) package, the reference transport:
 
 ```csharp
-builder.Services.AddTinyFlags(options =>
+builder.Services.UseHttpTransport(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
     options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
@@ -73,7 +78,9 @@ builder.Services.AddTinyFlags(options =>
 ```
 
 This registers your assemblies' declared flags with the server in the background after startup,
-and keeps values synchronized on a recurring interval. See
+and keeps values synchronized on a recurring interval. HTTP is just one implementation of
+TinyFlags' transport contracts (`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`,
+`IFeatureValuesSubscription`, in the core package) — see
 [Getting Started](docs/getting-started.md) for the complete walkthrough.
 
 ## Supported declarations
@@ -183,9 +190,11 @@ verification script.
 ## Components
 
 ```text
-src/TinyFlags                  Marker, local values and catalog composition (net8.0)
+src/TinyFlags                  Marker, local values, catalog composition, transport contracts (net8.0)
+src/TinyFlags.Http              Reference HTTP transport implementation (net8.0)
 src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
 tests/TinyFlags.Tests
+tests/TinyFlags.Http.Tests
 tests/TinyFlags.SourceGen.Tests
 ```
 

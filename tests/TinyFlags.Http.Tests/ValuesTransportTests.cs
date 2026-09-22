@@ -37,7 +37,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(EmptySnapshot.Replace(":1", ":2"), context.RequestAborted);
         }, "/prefix");
         using var http = new HttpClient();
-        var sdk = CreateClient(http, new TinyFlagsClientOptions
+        var sdk = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single() + prefix), ApiKey = "test-key",
             RetryDelay = TimeSpan.FromMilliseconds(10), MaxRetryDelay = TimeSpan.FromMilliseconds(20)
@@ -77,7 +77,7 @@ public sealed class ValuesTransportTests
             await context.Response.Body.WriteAsync(payload, context.RequestAborted);
         });
         using var http = new HttpClient();
-        var sdk = CreateClient(http, new TinyFlagsClientOptions
+        var sdk = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key",
             MaxSnapshotBytes = payload.Length - excessBytes
@@ -124,7 +124,7 @@ public sealed class ValuesTransportTests
             await Task.Delay(Timeout.InfiniteTimeSpan, context.RequestAborted);
         });
         using var http = new HttpClient { Timeout = source == "http" ? TimeSpan.FromSeconds(2) : Timeout.InfiniteTimeSpan };
-        var sdk = CreateClient(http, new TinyFlagsClientOptions
+        var sdk = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key",
             RequestTimeout = TimeSpan.FromSeconds(source == "sdk" ? 2 : 30)
@@ -164,7 +164,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(json, context.RequestAborted);
         });
         using var http = new HttpClient();
-        var sdk = CreateClient(http, new TinyFlagsClientOptions
+        var sdk = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
@@ -192,7 +192,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(EmptySnapshot, context.RequestAborted);
         });
         using var http = new HttpClient();
-        var sdk = CreateClient(http, new TinyFlagsClientOptions
+        var sdk = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
@@ -217,7 +217,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(EmptySnapshot.Replace(":1", ":" + serverRevision), context.RequestAborted);
         });
         using var http = new HttpClient();
-        using var client = CreateClient(http, new TinyFlagsClientOptions
+        using var client = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
@@ -259,7 +259,7 @@ public sealed class ValuesTransportTests
             return Task.CompletedTask;
         });
         using var http = new HttpClient();
-        using var client = CreateClient(http, new TinyFlagsClientOptions
+        using var client = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
@@ -288,7 +288,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(EmptySnapshot.Replace(":1", ":2"), context.RequestAborted);
         });
         using var http = new HttpClient();
-        using var client = CreateClient(http, new TinyFlagsClientOptions
+        using var client = CreateClient(http, new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key"
         });
@@ -309,7 +309,7 @@ public sealed class ValuesTransportTests
             await context.Response.WriteAsync(EmptySnapshot, context.RequestAborted);
         });
         using var http = new HttpClient();
-        var options = new TinyFlagsClientOptions { Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key" };
+        var options = new TinyFlagsHttpOptions { Endpoint = new Uri(server.Urls.Single()), ApiKey = "test-key" };
         using var client = new TinyFlagsApiClient(http, options, new FeatureSnapshotReader(1));
 
         var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => client.GetValuesAsync([]));
@@ -326,6 +326,6 @@ public sealed class ValuesTransportTests
         await server.StartAsync();
         return server;
     }
-    private static TinyFlagsApiClient CreateClient(HttpClient http, TinyFlagsClientOptions options)
+    private static TinyFlagsApiClient CreateClient(HttpClient http, TinyFlagsHttpOptions options)
         => new(http, options, new FeatureSnapshotReader(options.MaxSnapshotBytes));
 }
