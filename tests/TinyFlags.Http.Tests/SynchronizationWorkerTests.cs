@@ -313,7 +313,7 @@ public sealed class SynchronizationWorkerTests
         {
             builder.Services.AddSingleton(values);
         }
-        void Configure(TinyFlagsClientOptions options)
+        void Configure(TinyFlagsHttpOptions options)
         {
             options.Endpoint = new Uri(server.Urls.Single());
             options.ApiKey = "test-key";
@@ -321,10 +321,10 @@ public sealed class SynchronizationWorkerTests
             options.MaxRetryDelay = TimeSpan.FromMilliseconds(40);
             options.RefreshInterval = refreshInterval ?? TimeSpan.FromSeconds(10);
         }
-        builder.Services.AddTinyFlags(Configure);
+        builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(Configure));
         if (configureTwice)
         {
-            builder.Services.AddTinyFlags(Configure);
+            builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(Configure));
         }
         return builder.Build();
     }

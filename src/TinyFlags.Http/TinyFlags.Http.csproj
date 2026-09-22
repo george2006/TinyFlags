@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
-    <Description>Typed feature flag declarations for TinyFlags.</Description>
+    <Description>The reference HTTP transport for TinyFlags, speaking the documented wire protocol against TinyFlags.Server or your own implementation.</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
@@ -12,12 +12,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="TinyFlags.Tests" />
+    <InternalsVisibleTo Include="TinyFlags.Http.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <ProjectReference Include="../TinyFlags/TinyFlags.csproj" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
-    <None Include="../TinyFlags.SourceGen/bin/$(Configuration)/netstandard2.0/TinyFlags.SourceGen.dll"
-          Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 </Project>

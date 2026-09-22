@@ -4,9 +4,9 @@ using System.Linq;
 namespace TinyFlags;
 
 /// <summary>
-/// Configures authenticated access to one TinyFlags server environment.
+/// Configures authenticated HTTP access to one TinyFlags server environment.
 /// </summary>
-public sealed class TinyFlagsClientOptions
+public sealed class TinyFlagsHttpOptions
 {
     public Uri? Endpoint { get; set; }
 
@@ -20,12 +20,13 @@ public sealed class TinyFlagsClientOptions
 
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>How often the polling worker checks this transport for changes.</summary>
     public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromSeconds(30);
 
-    internal TinyFlagsClientOptions CreateSnapshot()
+    internal TinyFlagsHttpOptions CreateSnapshot()
     {
         Validate();
-        return new TinyFlagsClientOptions
+        return new TinyFlagsHttpOptions
         {
             Endpoint = new Uri(Endpoint!.AbsoluteUri.TrimEnd('/') + "/"),
             ApiKey = ApiKey,
@@ -37,7 +38,7 @@ public sealed class TinyFlagsClientOptions
         };
     }
 
-    internal bool HasSameConfigurationAs(TinyFlagsClientOptions other)
+    internal bool HasSameConfigurationAs(TinyFlagsHttpOptions other)
         => Endpoint == other.Endpoint && ApiKey == other.ApiKey && RequestTimeout == other.RequestTimeout
             && MaxSnapshotBytes == other.MaxSnapshotBytes
             && RetryDelay == other.RetryDelay && MaxRetryDelay == other.MaxRetryDelay

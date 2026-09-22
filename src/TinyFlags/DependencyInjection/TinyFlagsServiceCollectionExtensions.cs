@@ -1,8 +1,6 @@
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
@@ -10,43 +8,17 @@ public static class TinyFlagsServiceCollectionExtensions
 {
     /// <summary>
     /// Registers a shared local store and applies contributions from initialized assemblies.
+    /// Local-only until <paramref name="configure"/> picks a transport, via an extension method a
+    /// transport package (e.g. TinyFlags.Http's <c>UseHttpTransport</c>) contributes on
+    /// <see cref="TinyFlagsOptions"/> - the same entry point regardless of which transport you use.
     /// </summary>
-    public static IServiceCollection AddTinyFlags(this IServiceCollection services)
+    public static IServiceCollection AddTinyFlags(this IServiceCollection services, Action<TinyFlagsOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<FeatureValues>();
         TinyFlagsBootstrap.Apply(services);
-        return services;
-    }
-
-    /// <summary>
-    /// Registers local flag access, background registration and initial value synchronization after host startup.
-    /// </summary>
-    public static IServiceCollection AddTinyFlags(this IServiceCollection services, Action<TinyFlagsClientOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configure);
-        var options = new TinyFlagsClientOptions();
-        configure(options);
-        var snapshot = options.CreateSnapshot();
-        var existing = services.LastOrDefault(service => service.ServiceType == typeof(TinyFlagsClientOptions));
-        if (existing is not null
-            && (existing.ImplementationInstance is not TinyFlagsClientOptions registered || !registered.HasSameConfigurationAs(snapshot)))
-        {
-            throw new InvalidOperationException("TinyFlags is already configured with different client settings.");
-        }
-
-        services.AddTinyFlags();
-        if (existing is null)
-        {
-            services.AddSingleton(snapshot);
-            services.AddSingleton(new FeatureSnapshotReader(snapshot.MaxSnapshotBytes));
-            services.AddSingleton(provider => new TinyFlagsApiClient(snapshot,
-                provider.GetRequiredService<FeatureSnapshotReader>(), provider.GetRequiredService<ILogger<TinyFlagsApiClient>>()));
-        }
-        services.AddHostedService<TinyFlagsRegistrationWorker>();
-        services.AddHostedService<TinyFlagsSynchronizationWorker>();
+        configure?.Invoke(new TinyFlagsOptions(services));
         return services;
     }
 }

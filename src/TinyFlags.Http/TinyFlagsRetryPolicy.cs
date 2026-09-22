@@ -13,7 +13,7 @@ internal sealed class TinyFlagsRetryPolicy
     private readonly TimeSpan initialDelay;
     private readonly TimeSpan maximumDelay;
 
-    public TinyFlagsRetryPolicy(TinyFlagsClientOptions options)
+    public TinyFlagsRetryPolicy(TinyFlagsHttpOptions options)
     {
         initialDelay = options.RetryDelay;
         maximumDelay = options.MaxRetryDelay;

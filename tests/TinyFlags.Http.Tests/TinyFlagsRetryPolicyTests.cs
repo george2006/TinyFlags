@@ -15,7 +15,7 @@ public sealed class TinyFlagsRetryPolicyTests
     [InlineData(599)]
     public void Transient_responses_get_a_positive_bounded_delay(int status)
     {
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions());
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions());
         using var response = new HttpResponseMessage((HttpStatusCode)status);
 
         var delay = retry.GetDelay(response, 0, DateTimeOffset.UtcNow);
@@ -35,7 +35,7 @@ public sealed class TinyFlagsRetryPolicyTests
     [InlineData(415)]
     public void Permanent_responses_and_success_do_not_retry_even_with_retry_after(int status)
     {
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions());
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions());
         using var response = new HttpResponseMessage((HttpStatusCode)status);
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(60));
 
@@ -45,7 +45,7 @@ public sealed class TinyFlagsRetryPolicyTests
     [Fact]
     public void Backoff_grows_is_jittered_and_stays_capped_through_a_long_outage()
     {
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions());
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions());
         var error = new HttpRequestException();
         Assert.InRange(retry.GetDelay(error, 1)!.Value, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
         Assert.InRange(retry.GetDelay(error, 2)!.Value, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4));
@@ -63,7 +63,7 @@ public sealed class TinyFlagsRetryPolicyTests
     [InlineData(503, true)]
     public void Server_minimum_wait_can_exceed_the_normal_cap(int status, bool useDate)
     {
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions());
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions());
         var now = new DateTimeOffset(2026, 9, 19, 12, 0, 0, TimeSpan.Zero);
         var minimum = TimeSpan.FromDays(90);
         using var response = new HttpResponseMessage((HttpStatusCode)status);
@@ -81,7 +81,7 @@ public sealed class TinyFlagsRetryPolicyTests
     [InlineData("Sat, 01 Jan 2000 00:00:00 GMT")]
     public void Invalid_or_expired_retry_after_keeps_backoff(string header)
     {
-        var retry = new TinyFlagsRetryPolicy(new TinyFlagsClientOptions());
+        var retry = new TinyFlagsRetryPolicy(new TinyFlagsHttpOptions());
         using var response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         response.Headers.TryAddWithoutValidation("Retry-After", header);
 

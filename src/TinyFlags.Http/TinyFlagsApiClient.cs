@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsApiClient : IDisposable
+internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatureValuesTransport, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -23,17 +23,17 @@ internal sealed class TinyFlagsApiClient : IDisposable
 
     private readonly HttpClient httpClient;
     private readonly bool ownsHttpClient;
-    private readonly TinyFlagsClientOptions options;
+    private readonly TinyFlagsHttpOptions options;
     private readonly Uri registrationEndpoint;
     private readonly Uri valuesEndpoint;
     private readonly TinyFlagsRetryPolicy retry;
     private readonly FeatureSnapshotReader snapshotReader;
     private readonly ILogger logger;
 
-    public TinyFlagsApiClient(TinyFlagsClientOptions options, FeatureSnapshotReader snapshotReader, ILogger? logger = null)
+    public TinyFlagsApiClient(TinyFlagsHttpOptions options, FeatureSnapshotReader snapshotReader, ILogger? logger = null)
         : this(CreateHttpClient(options, snapshotReader), options, snapshotReader, logger) => ownsHttpClient = true;
 
-    public TinyFlagsApiClient(HttpClient httpClient, TinyFlagsClientOptions options,
+    public TinyFlagsApiClient(HttpClient httpClient, TinyFlagsHttpOptions options,
         FeatureSnapshotReader snapshotReader, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
@@ -48,7 +48,7 @@ internal sealed class TinyFlagsApiClient : IDisposable
         this.logger = logger ?? NullLogger.Instance;
     }
 
-    public async Task RegisterDefinitionsAsync(IReadOnlyList<FeatureDefinition> definitions, CancellationToken ct = default)
+    public async Task RegisterAsync(IReadOnlyList<FeatureDefinition> definitions, CancellationToken ct = default)
     {
         var catalog = CopyCatalog(definitions);
         await retry.ExecuteAsync(token => SendRegistrationAsync(catalog, token),
@@ -56,7 +56,7 @@ internal sealed class TinyFlagsApiClient : IDisposable
     }
 
     public Task<FeatureValuesResult> GetValuesAsync(IReadOnlyList<FeatureDefinition> catalog,
-        FeatureSnapshot? current = null, CancellationToken ct = default)
+        FeatureValuesCursor? current = null, CancellationToken ct = default)
     {
         var definitions = CopyCatalog(catalog);
         return retry.ExecuteAsync(token => SendValuesAsync(current, token),
@@ -79,13 +79,16 @@ internal sealed class TinyFlagsApiClient : IDisposable
         return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendValuesAsync(FeatureSnapshot? current, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendValuesAsync(FeatureValuesCursor? current, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, valuesEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
         if (current is not null)
         {
-            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(current.EntityTag));
+            // The protocol fixes this as a weak entity tag (docs/protocol.md); TinyFlags.Server always
+            // sends one, and a client-sent strong tag would fail its weak-comparison expectations.
+            var entityTag = $"W/{FeatureSnapshotEntityTag.Format(current.EnvironmentId, current.Revision)}";
+            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(entityTag));
         }
         return await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
     }
@@ -100,7 +103,7 @@ internal sealed class TinyFlagsApiClient : IDisposable
     }
 
     private async Task<FeatureValuesResult> ReadValuesAsync(HttpResponseMessage response,
-        IReadOnlyList<FeatureDefinition> catalog, FeatureSnapshot? current, CancellationToken ct)
+        IReadOnlyList<FeatureDefinition> catalog, FeatureValuesCursor? current, CancellationToken ct)
     {
         try
         {
@@ -114,14 +117,14 @@ internal sealed class TinyFlagsApiClient : IDisposable
                 throw RejectedResponse(response.StatusCode);
             }
 
-            var snapshot = await snapshotReader.ReadAsync(response, catalog, ct).ConfigureAwait(false);
-            if (current is not null && snapshot.EnvironmentId != current.EnvironmentId)
+            var (cursor, values) = await snapshotReader.ReadAsync(response, catalog, ct).ConfigureAwait(false);
+            if (current is not null && cursor.EnvironmentId != current.EnvironmentId)
             {
                 throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
             }
-            return current is not null && snapshot.Revision <= current.Revision
+            return current is not null && cursor.Revision <= current.Revision
                 ? FeatureValuesResult.Unchanged()
-                : FeatureValuesResult.Updated(snapshot);
+                : FeatureValuesResult.Updated(cursor, values);
         }
         catch (JsonException)
         {
@@ -154,7 +157,7 @@ internal sealed class TinyFlagsApiClient : IDisposable
         return snapshot;
     }
 
-    private static HttpClient CreateHttpClient(TinyFlagsClientOptions options, FeatureSnapshotReader snapshotReader)
+    private static HttpClient CreateHttpClient(TinyFlagsHttpOptions options, FeatureSnapshotReader snapshotReader)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(snapshotReader);

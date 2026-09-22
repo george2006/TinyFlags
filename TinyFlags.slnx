@@ -7,10 +7,12 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/TinyFlags/TinyFlags.csproj" />
+    <Project Path="src/TinyFlags.Http/TinyFlags.Http.csproj" />
     <Project Path="src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TinyFlags.Tests/TinyFlags.Tests.csproj" />
+    <Project Path="tests/TinyFlags.Http.Tests/TinyFlags.Http.Tests.csproj" />
     <Project Path="tests/TinyFlags.SourceGen.Tests/TinyFlags.SourceGen.Tests.csproj" />
   </Folder>
 </Solution>

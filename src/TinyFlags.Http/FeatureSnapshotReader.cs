@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -22,7 +21,7 @@ internal sealed class FeatureSnapshotReader
         this.maxSnapshotBytes = maxSnapshotBytes;
     }
 
-    public async Task<FeatureSnapshot> ReadAsync(HttpResponseMessage response,
+    public async Task<(FeatureValuesCursor Cursor, Dictionary<string, object> Values)> ReadAsync(HttpResponseMessage response,
         IReadOnlyList<FeatureDefinition> catalog, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(response);
@@ -42,19 +41,19 @@ internal sealed class FeatureSnapshotReader
         var root = document.RootElement;
         ValidateObject(root);
         var revision = ReadRevision(root);
-        var (environmentId, entityTag) = ReadEntityTag(response, revision);
+        var environmentId = ReadEnvironmentId(response, revision);
         var values = ReadValues(root, catalog, ct);
         ct.ThrowIfCancellationRequested();
-        return new FeatureSnapshot(environmentId, revision, entityTag, values);
+        return (new FeatureValuesCursor(environmentId, revision), values);
     }
 
-    public void ValidateUnchanged(HttpResponseMessage response, FeatureSnapshot? current)
+    public void ValidateUnchanged(HttpResponseMessage response, FeatureValuesCursor? current)
     {
         if (current is null)
         {
             throw new JsonException("An unchanged response requires an accepted snapshot.");
         }
-        var (environmentId, _) = ReadEntityTag(response, current.Revision);
+        var environmentId = ReadEnvironmentId(response, current.Revision);
         if (environmentId != current.EnvironmentId)
         {
             throw new JsonException("The unchanged response belongs to another environment.");
@@ -102,7 +101,7 @@ internal sealed class FeatureSnapshotReader
         return revision;
     }
 
-    private static (Guid EnvironmentId, string ETag) ReadEntityTag(HttpResponseMessage response, long revision)
+    private static Guid ReadEnvironmentId(HttpResponseMessage response, long revision)
     {
         var headers = response.Headers.TryGetValues("ETag", out var values) ? values.ToArray() : Array.Empty<string>();
         if (headers.Length != 1 || !EntityTagHeaderValue.TryParse(headers[0], out var tag))
@@ -116,12 +115,11 @@ internal sealed class FeatureSnapshotReader
             throw new JsonException("The snapshot ETag requires an environment identity.");
         }
 
-        var expected = $"\"{environmentId:D}:{revision.ToString(CultureInfo.InvariantCulture)}\"";
-        if (tag.Tag != expected)
+        if (tag.Tag != FeatureSnapshotEntityTag.Format(environmentId, revision))
         {
             throw new JsonException("The snapshot revision and ETag do not match.");
         }
-        return (environmentId, tag.ToString());
+        return environmentId;
     }
 
     private static Dictionary<string, object> ReadValues(JsonElement root,

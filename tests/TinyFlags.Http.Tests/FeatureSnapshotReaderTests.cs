@@ -21,18 +21,15 @@ public sealed class FeatureSnapshotReaderTests
             """);
         var catalog = new[] { FeatureDefinition.Boolean("Enabled", false), FeatureDefinition.String("Label", "Local") };
 
-        var snapshot = await ReadAsync(response, catalog);
+        var (cursor, values) = await ReadAsync(response, catalog);
         response.Dispose();
 
-        Assert.Equal(Guid.Parse(EnvironmentText), snapshot.EnvironmentId);
-        Assert.Equal(12, snapshot.Revision);
-        Assert.Equal(ETag, snapshot.EntityTag);
-        Assert.True(Assert.IsType<bool>(snapshot.Values["Enabled"]));
-        Assert.False(Assert.IsType<bool>(snapshot.Values["enabled"]));
-        Assert.Equal("Buy \"now\"", snapshot.Values["Label"]);
-        Assert.Equal("", snapshot.Values["OtherAssembly.Empty"]);
-        var dictionary = Assert.IsAssignableFrom<IDictionary<string, object>>(snapshot.Values);
-        Assert.Throws<NotSupportedException>(() => dictionary.Add("Mutation", true));
+        Assert.Equal(Guid.Parse(EnvironmentText), cursor.EnvironmentId);
+        Assert.Equal(12, cursor.Revision);
+        Assert.True(Assert.IsType<bool>(values["Enabled"]));
+        Assert.False(Assert.IsType<bool>(values["enabled"]));
+        Assert.Equal("Buy \"now\"", values["Label"]);
+        Assert.Equal("", values["OtherAssembly.Empty"]);
     }
 
     [Theory]
@@ -44,10 +41,10 @@ public sealed class FeatureSnapshotReaderTests
         using var response = Response($$"""{"revision":{{revision}},"values":[]} """,
             $"W/\"{EnvironmentText}:{revision}\"");
 
-        var snapshot = await ReadAsync(response, [FeatureDefinition.Boolean("Missing", true)]);
+        var (cursor, values) = await ReadAsync(response, [FeatureDefinition.Boolean("Missing", true)]);
 
-        Assert.Equal(revision, snapshot.Revision);
-        Assert.Empty(snapshot.Values);
+        Assert.Equal(revision, cursor.Revision);
+        Assert.Empty(values);
     }
 
     [Fact]
@@ -56,10 +53,10 @@ public sealed class FeatureSnapshotReaderTests
         var entries = Enumerable.Range(0, 1001).Select(index => new { key = "Flag" + index, kind = "Boolean", value = true });
         using var response = Response(JsonSerializer.Serialize(new { revision = 12, values = entries }));
 
-        var snapshot = await ReadAsync(response, []);
+        var (_, values) = await ReadAsync(response, []);
 
-        Assert.Equal(1001, snapshot.Values.Count);
-        Assert.True(Assert.IsType<bool>(snapshot.Values["Flag1000"]));
+        Assert.Equal(1001, values.Count);
+        Assert.True(Assert.IsType<bool>(values["Flag1000"]));
     }
 
     [Theory]
@@ -154,7 +151,7 @@ public sealed class FeatureSnapshotReaderTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReadAsync(response, [], cancellation.Token));
     }
 
-    private static Task<FeatureSnapshot> ReadAsync(HttpResponseMessage response,
+    private static Task<(FeatureValuesCursor Cursor, Dictionary<string, object> Values)> ReadAsync(HttpResponseMessage response,
         IReadOnlyList<FeatureDefinition> catalog, CancellationToken ct = default)
         => new FeatureSnapshotReader(8 * 1024 * 1024).ReadAsync(response, catalog, ct);
 

@@ -6,19 +6,19 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
-internal sealed class TinyFlagsSynchronizationWorker : BackgroundService
+public sealed class TinyFlagsSynchronizationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TinyFlagsApiClient client;
+    private readonly IFeatureValuesTransport transport;
     private readonly FeatureValues values;
-    private readonly TinyFlagsClientOptions options;
+    private readonly FeatureValuesPollingOptions options;
     private readonly IHostApplicationLifetime lifetime;
     private readonly ILogger<TinyFlagsSynchronizationWorker> logger;
 
-    public TinyFlagsSynchronizationWorker(TinyFlagsApiClient client, FeatureValues values, TinyFlagsClientOptions options,
+    public TinyFlagsSynchronizationWorker(IFeatureValuesTransport transport, FeatureValues values, FeatureValuesPollingOptions options,
         IHostApplicationLifetime lifetime, ILogger<TinyFlagsSynchronizationWorker> logger)
     {
-        this.client = client;
+        this.transport = transport;
         this.values = values;
         this.options = options;
         this.lifetime = lifetime;
@@ -42,7 +42,7 @@ internal sealed class TinyFlagsSynchronizationWorker : BackgroundService
 
     private async Task PollAsync(CancellationToken ct)
     {
-        FeatureSnapshot? accepted = null;
+        FeatureValuesCursor? accepted = null;
         while (true)
         {
             try
@@ -73,19 +73,18 @@ internal sealed class TinyFlagsSynchronizationWorker : BackgroundService
         }
     }
 
-    private async Task<FeatureSnapshot?> SynchronizeAsync(FeatureSnapshot? current, CancellationToken ct)
+    private async Task<FeatureValuesCursor?> SynchronizeAsync(FeatureValuesCursor? current, CancellationToken ct)
     {
-        var result = await client.GetValuesAsync(TinyFlagsBootstrap.GetDefinitions(), current, ct).ConfigureAwait(false);
-        var snapshot = result.Snapshot;
-        if (snapshot is null)
+        var result = await transport.GetValuesAsync(TinyFlagsBootstrap.GetDefinitions(), current, ct).ConfigureAwait(false);
+        if (result.IsUnchanged)
         {
             return current;
         }
 
         ct.ThrowIfCancellationRequested();
-        values.ReplaceSnapshot(snapshot.Values);
-        logger.LogInformation("TinyFlags values synchronized at revision {Revision}.", snapshot.Revision);
-        return snapshot;
+        values.ReplaceSnapshot(result.Values!);
+        logger.LogInformation("TinyFlags values synchronized at revision {Revision}.", result.Cursor!.Revision);
+        return result.Cursor;
     }
 
     private TimeSpan NextRefreshDelay()
