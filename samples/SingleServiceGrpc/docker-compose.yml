@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    environment:
+      POSTGRES_DB: tinyflags
+      POSTGRES_USER: tinyflags
+      POSTGRES_PASSWORD: tinyflags-sample
+    ports:
+      - "127.0.0.1:54328:5432"
+    volumes:
+      - tinyflags-sample-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinyflags -d tinyflags"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  # TinyFlags clients require HTTPS or a loopback endpoint - app below shares this container's
+  # network namespace so "http://localhost" is genuinely correct for it, not a bypass of that check.
+  #
+  # This pulls the published TinyFlags.Server image rather than building from source - the server
+  # lives in its own repo now (github.com/george2006/TinyFlags.Server). TinyFlags__License is a
+  # real, time-limited evaluation license (expires ~2026-09-28); replace it with your own once it
+  # expires, requested from TinyBoutique. Without a valid license the server refuses to start.
+  tinyflags-server:
+    image: ghcr.io/george2006/tinyflags-server:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+      TinyFlags__License: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqZHVyYmFuQGdtYWlsLmNvbSIsIm5iZiI6MTc5MDAxNTEwNCwiZXhwIjoxNzkwNjE5OTA0LCJpYXQiOjE3OTAwMTUxMDR9.P04LFx5lyC8gM2ZTRkRCqIJKGJtWSsmhcwpBLscerbw4eg9mM-bNzf_dEdhENTnAvoiTEOdVNltpK7kVfbxst1vCofgHKXBw508ftX_uqNa1YBegZwCWOONhwRcVXWOrnW4Nfq-qcvzFzGeyWqwHzgW6fgZlb92rWKRfLnqZTg6xoALHEZOle9G34RPzhqXHMrzlDRSIPej7N5wcD8oqf7VLvv_YveNDRUHQFapYzip5RJOcDfzQfae_iQjqAm4nbITe7OkSUSb5XnMpA7Cn_ezbWxX-0WR2-2fCkxTrhq-E7BIzQKhfswz3KZASQIIkIfFRC2-PG6UCmM4B1CPwHw"
+    ports:
+      - "127.0.0.1:8097:8080" # TinyFlags.Server itself / the admin dashboard
+      - "127.0.0.1:8099:8081" # TinyFlags.Server's gRPC listener (not curl-friendly, exposed for completeness)
+      - "127.0.0.1:8098:8082" # app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-shot: migrates the database, creates a project/environment/client key, and issues an
+  # admin token - writing the two secrets to a shared volume instead of a console you'd copy from.
+  # Runs once per `docker compose up`, then exits; app waits for it.
+  bootstrap:
+    image: ghcr.io/george2006/tinyflags-server:latest
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__TinyFlags: "Host=postgres;Port=5432;Database=tinyflags;Username=tinyflags;Password=tinyflags-sample"
+    volumes:
+      - tinyflags-sample-keys:/keys
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "dotnet TinyFlags.Server.dll --migrate && dotnet TinyFlags.Server.dll --environment Development --seed-development | tail -n 1 > /keys/client.key && dotnet TinyFlags.Server.dll --environment Development --issue-admin-key --label Sample | tail -n 1 | tee /keys/admin.key"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: ../..
+      dockerfile: samples/SingleServiceGrpc/Dockerfile
+    network_mode: "service:tinyflags-server"
+    environment:
+      ASPNETCORE_URLS: "http://+:8082"
+      # TinyFlags.Server's gRPC listener, not its REST one (8080) - the gRPC transport speaks
+      # tinyflags.proto directly, no HTTP JSON involved.
+      TinyFlags__Endpoint: "http://localhost:8081"
+    volumes:
+      - tinyflags-sample-keys:/keys:ro
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      tinyflags-server:
+        condition: service_started
+
+volumes:
+  tinyflags-sample-db:
+  tinyflags-sample-keys:

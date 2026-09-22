@@ -32,7 +32,10 @@ services:
       TinyFlags__License: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqZHVyYmFuQGdtYWlsLmNvbSIsIm5iZiI6MTc5MDAxNTEwNCwiZXhwIjoxNzkwNjE5OTA0LCJpYXQiOjE3OTAwMTUxMDR9.P04LFx5lyC8gM2ZTRkRCqIJKGJtWSsmhcwpBLscerbw4eg9mM-bNzf_dEdhENTnAvoiTEOdVNltpK7kVfbxst1vCofgHKXBw508ftX_uqNa1YBegZwCWOONhwRcVXWOrnW4Nfq-qcvzFzGeyWqwHzgW6fgZlb92rWKRfLnqZTg6xoALHEZOle9G34RPzhqXHMrzlDRSIPej7N5wcD8oqf7VLvv_YveNDRUHQFapYzip5RJOcDfzQfae_iQjqAm4nbITe7OkSUSb5XnMpA7Cn_ezbWxX-0WR2-2fCkxTrhq-E7BIzQKhfswz3KZASQIIkIfFRC2-PG6UCmM4B1CPwHw"
     ports:
       - "127.0.0.1:8085:8080" # TinyFlags.Server itself / the admin dashboard
-      - "127.0.0.1:8090:8081" # orders-service
+      # TinyFlags.Server also binds 8081 itself (its own gRPC listener, always on, unrelated to
+      # this HTTP-only sample) - orders-service uses 8083 instead of 8081 to avoid colliding with
+      # it inside this shared network namespace. Host-side port (8090) is unaffected.
+      - "127.0.0.1:8090:8083" # orders-service
       - "127.0.0.1:8091:8082" # payments-service
     depends_on:
       postgres:
@@ -64,10 +67,10 @@ services:
   orders-service:
     build:
       context: ../../.
-      dockerfile: samples/MultiService/OrdersService/Dockerfile
+      dockerfile: samples/MultiServiceHttp/OrdersService/Dockerfile
     network_mode: "service:tinyflags-server"
     environment:
-      ASPNETCORE_URLS: "http://+:8081"
+      ASPNETCORE_URLS: "http://+:8083"
       TinyFlags__Endpoint: "http://localhost:8080"
     volumes:
       - tinyflags-sample-keys:/keys:ro
@@ -80,7 +83,7 @@ services:
   payments-service:
     build:
       context: ../../.
-      dockerfile: samples/MultiService/PaymentsService/Dockerfile
+      dockerfile: samples/MultiServiceHttp/PaymentsService/Dockerfile
     network_mode: "service:tinyflags-server"
     environment:
       ASPNETCORE_URLS: "http://+:8082"

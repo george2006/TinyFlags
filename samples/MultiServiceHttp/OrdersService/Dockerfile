@@ -3,13 +3,13 @@ WORKDIR /src
 COPY src/TinyFlags/ src/TinyFlags/
 COPY src/TinyFlags.Http/ src/TinyFlags.Http/
 COPY src/TinyFlags.SourceGen/ src/TinyFlags.SourceGen/
-COPY samples/MultiService/PaymentsService/ samples/MultiService/PaymentsService/
-RUN dotnet publish samples/MultiService/PaymentsService/PaymentsService.csproj -c Release -o /app
+COPY samples/MultiServiceHttp/OrdersService/ samples/MultiServiceHttp/OrdersService/
+RUN dotnet publish samples/MultiServiceHttp/OrdersService/OrdersService.csproj -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
-EXPOSE 8082
+EXPOSE 8081
 # The client key is written by the sample's one-shot bootstrap step to a shared volume, not baked
 # into the image or passed as a plain env var, so it's read at container start, not build time.
-ENTRYPOINT ["/bin/sh", "-c", "export TinyFlags__ApiKey=$(cat /keys/client.key) && exec dotnet PaymentsService.dll"]
+ENTRYPOINT ["/bin/sh", "-c", "export TinyFlags__ApiKey=$(cat /keys/client.key) && exec dotnet OrdersService.dll"]
