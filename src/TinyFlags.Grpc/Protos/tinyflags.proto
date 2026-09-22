@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package tinyflags.v1;
+
+option csharp_namespace = "TinyFlags.Grpc";
+
+// Mirrors TinyFlagsApiClient's approach: authentication is a Bearer token, but here it travels
+// as gRPC call metadata ("authorization: Bearer <api-key>"), not a field on any message.
+service TinyFlagsValues {
+  // Streams the current snapshot immediately on connect, then one message per real change.
+  // Never completes on its own - the client holds the call open for as long as it wants updates.
+  // Reconnection after a dropped stream is the client implementation's job, not this contract's -
+  // calling Watch again always yields a fresh full snapshot first, same as a fresh connection.
+  rpc Watch(WatchRequest) returns (stream ValuesSnapshot);
+}
+
+message WatchRequest {}
+
+enum FeatureKind {
+  FEATURE_KIND_UNSPECIFIED = 0;
+  FEATURE_KIND_BOOLEAN = 1;
+  FEATURE_KIND_STRING = 2;
+}
+
+message FeatureValue {
+  string key = 1;
+  FeatureKind kind = 2;
+  // Redundant with kind by construction, kept anyway - mirrors the HTTP contract's philosophy of
+  // being strict rather than lenient (FeatureSnapshotReader cross-checks kind against value type
+  // instead of trusting one or the other).
+  oneof value {
+    bool bool_value = 3;
+    string string_value = 4;
+  }
+}
+
+message ValuesSnapshot {
+  // GUID, "D" format - same representation docs/protocol.md's ETag already uses, so anyone who's
+  // read that doc recognizes this immediately.
+  string environment_id = 1;
+  int64 revision = 2;
+  repeated FeatureValue values = 3;
+}

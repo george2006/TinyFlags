@@ -1215,3 +1215,12 @@ a green light to start coding.
    to describe the contracts, mark `TinyFlags.Server` explicitly as "the reference HTTP
    implementation," and add a "build your own transport" guide — the actual deliverable for the
    "we let clever guys do that" goal, since we're shipping seams and docs, not other transports.
+7. **`TinyFlags.Grpc` — not started.** The real gRPC implementation of `IFeatureValuesSubscription`,
+   mirroring `TinyFlags.Http`'s shape (own options type, `tinyFlags.UseGrpcSubscription(...)`
+   extending `TinyFlagsOptions`). Blocked on the `TinyFlags.Server` side existing first — needs a
+   real server to test against, same discipline every other slice tonight used. Wire contract
+   settled 2026-09-22: `src/TinyFlags.Grpc/Protos/tinyflags.proto` (project itself not scaffolded
+   yet, just the `.proto`) — one streaming RPC, `Watch`, returning `ValuesSnapshot` with
+   `environment_id`/`revision`/`values`, `environment_id` cross-checked on every message the same
+   way `TinyFlagsApiClient` already cross-checks its ETag. Full cross-repo plan, including the
+   server-side `LISTEN`/`NOTIFY` mechanism, is in `TinyFlags.Server`'s own `PLAN.md`.
