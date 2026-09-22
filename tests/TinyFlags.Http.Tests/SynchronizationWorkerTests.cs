@@ -321,10 +321,10 @@ public sealed class SynchronizationWorkerTests
             options.MaxRetryDelay = TimeSpan.FromMilliseconds(40);
             options.RefreshInterval = refreshInterval ?? TimeSpan.FromSeconds(10);
         }
-        builder.Services.UseHttpTransport(Configure);
+        builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(Configure));
         if (configureTwice)
         {
-            builder.Services.UseHttpTransport(Configure);
+            builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(Configure));
         }
         return builder.Build();
     }

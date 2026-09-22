@@ -63,11 +63,11 @@ implementation of the transport contracts (`IFeatureDefinitionsTransport`, `IFea
 in the core package's `Abstractions/` folder:
 
 ```csharp
-builder.Services.UseHttpTransport(options =>
+builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
     options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
-});
+}));
 ```
 
 This does everything Option A does, plus two independent background workers started after

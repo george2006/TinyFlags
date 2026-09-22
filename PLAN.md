@@ -1086,6 +1086,24 @@ just `EnvironmentId` + `Revision`, no `EntityTag`.
    translates it internally, so the configuration experience is unchanged even though the actual
    dependency moved.
 
+   Revised again same day: the first cut had samples calling `UseHttpTransport(...)` alone, with
+   `AddTinyFlags` never appearing anywhere in consumer code. Called out as a real problem, not
+   style — `AddTinyFlags` is the framework's recognizable root entry point (same role as
+   `AddMediatR`), and a public library where different consumers pick different transports needs
+   that root always visible, unlike a single-owner app that only ever uses one backend (checked
+   real `TinyEvents.Dogfood` code: the single-consumer Worker app calls `UseTinyEvents(...)`
+   explicitly because it has real settings to configure; the Producer app, with nothing to
+   configure, calls only `UseSqlServerAdoNetOutbox(...)` — neither example actually argues for
+   "always call the root," they just don't apply to a multi-transport public library). Fixed by
+   having `AddTinyFlags` take `Action<TinyFlagsOptions>? configure`, where `TinyFlagsOptions`
+   exposes `Services` for a transport package's own extension method to register against —
+   `TinyFlags.Http`'s `UseHttpTransport` is now `TinyFlagsOptions -> TinyFlagsOptions`, not
+   `IServiceCollection -> IServiceCollection`. Usage:
+   `services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options => ...))` — one
+   recognizable root regardless of transport, core never references HTTP. All 15 call sites across
+   the HTTP test project and both samples updated to the nested shape; full suite re-verified green
+   (298 tests) and re-checked live against the published server once more.
+
    New project layout: `src/TinyFlags.Http` (implementation), `tests/TinyFlags.Http.Tests`
    (mirroring the `TinyEvents.PostgreSql.AdoNet.Tests`-style per-package split — confirmed as
    precedent before doing it). `tests/TinyFlags.Tests` now only holds transport-agnostic tests

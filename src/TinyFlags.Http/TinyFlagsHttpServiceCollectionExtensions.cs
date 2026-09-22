@@ -9,13 +9,15 @@ namespace TinyFlags;
 public static class TinyFlagsHttpServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the reference HTTP transport: local flag access, background registration and
-    /// polling value synchronization after host startup.
+    /// Picks the reference HTTP transport: local flag access, background registration and polling
+    /// value synchronization after host startup. Called from <c>AddTinyFlags</c>'s configure
+    /// callback - <c>services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(...))</c>.
     /// </summary>
-    public static IServiceCollection UseHttpTransport(this IServiceCollection services, Action<TinyFlagsHttpOptions> configure)
+    public static TinyFlagsOptions UseHttpTransport(this TinyFlagsOptions tinyFlags, Action<TinyFlagsHttpOptions> configure)
     {
-        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(tinyFlags);
         ArgumentNullException.ThrowIfNull(configure);
+        var services = tinyFlags.Services;
         var options = new TinyFlagsHttpOptions();
         configure(options);
         var snapshot = options.CreateSnapshot();
@@ -26,7 +28,6 @@ public static class TinyFlagsHttpServiceCollectionExtensions
             throw new InvalidOperationException("TinyFlags HTTP transport is already configured with different settings.");
         }
 
-        services.AddTinyFlags();
         if (existing is null)
         {
             services.AddSingleton(snapshot);
@@ -39,6 +40,6 @@ public static class TinyFlagsHttpServiceCollectionExtensions
         }
         services.AddHostedService<TinyFlagsRegistrationWorker>();
         services.AddHostedService<TinyFlagsSynchronizationWorker>();
-        return services;
+        return tinyFlags;
     }
 }

@@ -75,12 +75,12 @@ public sealed partial class RegistrationWorkerTests
             context.Response.StatusCode = StatusCodes.Status204NoContent;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.UseHttpTransport(options =>
+        builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMilliseconds(20);
             options.MaxRetryDelay = TimeSpan.FromMilliseconds(40);
-        });
+        }));
         using var host = builder.Build();
         try
         {
@@ -125,12 +125,12 @@ public sealed partial class RegistrationWorkerTests
             return Task.CompletedTask;
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.UseHttpTransport(options =>
+        builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMilliseconds(10);
             options.MaxRetryDelay = TimeSpan.FromMilliseconds(20);
-        });
+        }));
         using var host = builder.Build();
 
         await host.StartAsync(timeout.Token);
@@ -165,12 +165,12 @@ public sealed partial class RegistrationWorkerTests
             });
         });
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.UseHttpTransport(options =>
+        builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
         {
             Configure(options, server);
             options.RetryDelay = TimeSpan.FromMinutes(1);
             options.MaxRetryDelay = TimeSpan.FromMinutes(1);
-        });
+        }));
         using var host = builder.Build();
         await host.StartAsync(timeout.Token);
         await responded.Task.WaitAsync(timeout.Token);
