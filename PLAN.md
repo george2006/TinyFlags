@@ -1184,12 +1184,33 @@ a green light to start coding.
    Full suite green (117 + 181 = 298, 0 warnings) and re-verified live against the published
    `TinyFlags.Server` image via `samples/MultiService` — registered and synchronized 0 → 2 cleanly,
    no warnings in any container.
-4. **Values push transport + second worker.** Add `IFeatureValuesSubscription`; add the dedicated
-   streaming worker that drains it. No concrete implementation ships — HTTP doesn't do push — this
-   is contract + worker shape only, dormant until someone implements it.
-5. **DI ergonomics.** Design how `AddTinyFlags` lets a caller choose/override the transport
-   elegantly, keeping HTTP as the zero-config default. Needs its own naming/shape discussion
-   (builder vs. overload vs. `.UseTransport<T>()`) before implementing — not decided yet.
+4. **Values push transport + second worker — implemented and verified 2026-09-22, awaiting review.**
+   Decided: reuse `FeatureValuesResult` for the stream (option 1), and the name
+   `TinyFlagsValuesWatchWorker` (option 2) — both confirmed by the user. `TinyFlags.Grpc` is the
+   planned real consumer (see `TinyFlags.Server`'s `PLAN.md` for the cross-repo gRPC plan).
+
+   `IFeatureValuesSubscription` added under `Abstractions/`, one method,
+   `WatchAsync(catalog, ct) -> IAsyncEnumerable<FeatureValuesResult>`. `TinyFlagsValuesWatchWorker`
+   added under `Synchronization/`, `public` from the start this time (learned that lesson from
+   `TinyFlagsRegistrationWorker`/`TinyFlagsSynchronizationWorker` needing it discovered mid-slice
+   last time) — mirrors the pull worker's startup/cancellation handling with no poll loop at all,
+   just `await foreach`, skipping `IsUnchanged` results defensively and replacing `FeatureValues`
+   on real updates. Each transport's `Use...` extension stays responsible for adding only the
+   workers its own interfaces satisfy, same pattern `UseHttpTransport` already uses — a push-only
+   setup must not add the pull worker and vice versa.
+
+   No concrete implementation exists yet (that's `TinyFlags.Grpc`, not started), so tested against
+   a hand-built fake `IFeatureValuesSubscription` — the first core test in this codebase to use a
+   test double rather than a real collaborator, and correctly so: there is no real transport yet
+   to test against, and the point of these four tests is the *worker's* contract with any
+   transport, not any one transport's behavior. Covers: applies updates in order and skips
+   `Unchanged`, host shutdown cancels an in-flight watch cleanly, a `TinyFlagsClientException`
+   stops the worker without crashing the host, an unexpected exception does the same. All pass;
+   full suite green at 302 (25 core / 117 source-gen / 160 HTTP).
+5. **DI ergonomics — done, ahead of schedule.** Turned out to be needed immediately, not later —
+   see "Packaging" above (revised 2026-09-22): `AddTinyFlags(Action<TinyFlagsOptions>?)` is the one
+   entry point, `TinyFlagsOptions.Services` is what a transport's own extension method registers
+   against. Already covers this slice's original question.
 6. **Docs.** Update `architecture.md`/`registration.md`/`value-synchronization.md`/`protocol.md`
    to describe the contracts, mark `TinyFlags.Server` explicitly as "the reference HTTP
    implementation," and add a "build your own transport" guide — the actual deliverable for the
