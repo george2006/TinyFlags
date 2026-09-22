@@ -1240,12 +1240,25 @@ a green light to start coding.
    gRPC + 117 source-gen + 160 HTTP), one unrelated pre-existing timing flake in
    `TinyFlags.Http.Tests` confirmed by rerunning it alone.
 
-   **Not yet done: live verification against a real running server.** Every other transport
-   tonight was proven against the real thing, not just unit tests — `TinyFlags.Http` via
-   `samples/MultiService`'s docker-compose against the published server image.
-   `TinyFlags.Server`'s gRPC support was only just built tonight and isn't in any published image
-   yet, so this needs either a fresh local image build or a new/extended sample. Explicitly the
-   next thing to decide, not silently skipped.
+   **Live verification — done, no Docker, no publishing.** Ran `TinyFlags.Server` directly via
+   `dotnet run` against a throwaway local Postgres container (not `WebApplicationFactory`, not a
+   published image — that step is still explicitly deferred until the server side is reviewed and
+   released for real, per the user's own call). A real `TinyFlagsGrpcTransport` registered a
+   definition and received it pushed back over a real `Watch` stream after a second registration.
+
+   This caught two real bugs neither side's unit/in-memory tests could have: Kestrel's h2c
+   negotiation needing two separate endpoints, not one shared one (see `TinyFlags.Server`'s
+   `PLAN.md`), and `Grpc.Net.Client` silently refusing to even attempt HTTP/2 over plain `http://`
+   without `Http2UnencryptedSupport` explicitly enabled — fixed in `TinyFlagsGrpcTransport`'s
+   constructor, scoped to only the loopback-`http` case `Validate()` already allows. Both sides
+   confirmed clean afterward: 314 tests here (25 core + 12 gRPC + 117 source-gen + 160 HTTP), 200
+   on the server side.
+
+   **Still explicitly deferred, on purpose:** the permanent two-sample setup (HTTP unchanged, a
+   new gRPC sample pulling a published image) needs `TinyFlags.Server`'s gRPC branch reviewed,
+   merged, and released as a real versioned image first — a sample built against unpublished
+   private-repo source would break for anyone who isn't the owner the moment they clone the public
+   client repo. Not something to build ahead of that decision.
 
    Wire contract: `src/TinyFlags.Grpc/Protos/tinyflags.proto`, two independent services, neither
    depending on the other existing — `TinyFlagsDefinitions.Register` (unary, one-shot) and

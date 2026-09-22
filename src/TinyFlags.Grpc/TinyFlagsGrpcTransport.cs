@@ -28,7 +28,14 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
     public TinyFlagsGrpcTransport(TinyFlagsGrpcOptions options)
     {
         this.options = options;
-        channel = GrpcChannel.ForAddress(options.Endpoint!);
+        if (options.Endpoint!.Scheme == Uri.UriSchemeHttp)
+        {
+            // Only ever reached for loopback (Validate() rejects http elsewhere) - .NET's
+            // HttpClient otherwise silently refuses to even attempt HTTP/2 over plain http://,
+            // which fails every call with no useful error pointing at why.
+            AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+        }
+        channel = GrpcChannel.ForAddress(options.Endpoint);
         definitionsClient = new TinyFlagsDefinitions.TinyFlagsDefinitionsClient(channel);
         valuesClient = new TinyFlagsValues.TinyFlagsValuesClient(channel);
     }
