@@ -70,11 +70,11 @@ That is local-only: flags read their declared defaults, with no network calls. T
 [TinyFlags.Http](src/TinyFlags.Http) package, the reference transport:
 
 ```csharp
-builder.Services.UseHttpTransport(options =>
+builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
     options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
-});
+}));
 ```
 
 This registers your assemblies' declared flags with the server in the background after startup,
