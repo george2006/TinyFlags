@@ -26,7 +26,6 @@ public sealed class FeatureSnapshotReaderTests
 
         Assert.Equal(Guid.Parse(EnvironmentText), snapshot.EnvironmentId);
         Assert.Equal(12, snapshot.Revision);
-        Assert.Equal(ETag, snapshot.EntityTag);
         Assert.True(Assert.IsType<bool>(snapshot.Values["Enabled"]));
         Assert.False(Assert.IsType<bool>(snapshot.Values["enabled"]));
         Assert.Equal("Buy \"now\"", snapshot.Values["Label"]);

@@ -981,37 +981,144 @@ repo. The admin-auth-scoping and licensing sections above now describe work that
 here — carried forward verbatim into that repo's own `PLAN.md`. Left in place here too, as
 historical record of when and why the decision was made; not re-litigated or removed.
 
-## Open item: repo history before going public (target: end of this week)
+## Resolved: repo history before going public
 
-This repo (`TinyFlags`, the client) is currently **private**. The plan is to flip it public around
-the end of the week, once the client + protocol are ready to stand on their own without the server
-source sitting behind them.
+Superseded same day (2026-09-21). Rewriting `main`'s history alone wouldn't have hidden the old
+merged PRs' server-source diffs (GitHub keeps `refs/pull/N/head` forever; PRs can't be deleted
+self-service). Went with the airtight option instead: deleted the old `TinyFlags` repo entirely
+and recreated it fresh under the same name, then pushed the already-rewritten, server-free `main`
+(65 commits) as its entire history. No PRs, no issues, no stale refs — nothing to find. Still
+private; public flip remains a future decision, now unblocked by any history concern.
 
-**What "before flipping to public" needs deciding, raised 2026-09-21:** commit history still
-contains `TinyFlags.Server`'s source from before the split (`git rm` removed it from the current
-tree, not from history). Two things to know before that day:
+## Next feature (draft, not yet approved): pluggable server transport
 
-- Rewriting `main`'s history (`git filter-branch`, stripping the server-only paths from every
-  commit) is possible and was scoped out this session, but **does not fully solve the problem on
-  its own** — GitHub keeps every merged PR's original commits alive via internal refs
-  (`refs/pull/N/head`) regardless of what happens to `main`. Several already-merged PRs here
-  touched `TinyFlags.Server` directly (admin dashboard, update-values-endpoint, admin dashboard
-  redesign, api-key-generation, the TinyValidations integration, the samples/quality-pass work)
-  and their "Files changed" tabs will keep showing that server source forever, independent of any
-  history rewrite — merged PRs aren't something you can delete through the normal GitHub UI.
-- Decided this session: not worth fighting hard for. No real secret-sauce IP in
-  `TinyFlags.Server` — it's "elegant CRUD," per the user's own words — and the actual thing being
-  protected is the licensed product/implementation, not the code's secrecy. The protocol being
-  public and reproducible by anyone is *intentional*, not a leak (see
-  `docs/protocol.md`) — "I do not care of people implementing their own endpoints."
+Raised 2026-09-21, drafted 2026-09-22. Goal: let people build their own server (not just
+`TinyFlags.Server`) without depending on its exact HTTP surface, by exposing public contracts for
+the SDK's independent responsibilities, and keep the HTTP implementation as one implementation of
+those contracts, not a privileged special case. This is a draft to mark up, not an approved design
+— nothing here is implemented, and per `WORKING-AGREEMENT.md` the 4-point abstraction ritual still
+needs to run per contract before any code.
 
-**Before the end-of-week flip, explicitly decide (don't default silently):**
+### Current shape, as it exists in code today
 
-1. Rewrite `main`'s history anyway, purely for tidiness (still won't hide the PRs) — yes/no.
-2. Leave the old PRs showing server source as a known, accepted tradeoff — most likely answer,
-   given the reasoning above, but say so explicitly rather than assuming.
-3. Anything else surface between now and then that changes the calculus (e.g., if
-   `TinyFlags.Server` gains real proprietary logic worth protecting by then, revisit).
+`TinyFlagsRegistrationWorker` and `TinyFlagsSynchronizationWorker` are `BackgroundService`s that
+already only depend on `TinyFlagsApiClient` through two calls — the seam is basically already
+there, just concrete and HTTP-only:
 
-No code or history changes needed today. This is a decision checklist for whoever picks this back
-up right before flipping visibility, not an in-progress task.
+```csharp
+Task RegisterDefinitionsAsync(IReadOnlyList<FeatureDefinition>, CancellationToken)
+Task<FeatureValuesResult> GetValuesAsync(IReadOnlyList<FeatureDefinition>, FeatureSnapshot? current, CancellationToken)
+```
+
+Two findings from reading the actual code, independent of whether the bigger split happens:
+
+- `FeatureSnapshot.EntityTag` carries zero information beyond `EnvironmentId` + `Revision` —
+  `FeatureSnapshotReader.ReadEntityTag` synthesizes and validates it as exactly
+  `"{environmentId}:{revision}"`. The transport-agnostic cursor only needs to be
+  `(EnvironmentId, Revision)`; HTTP can rebuild its own `If-None-Match` from those two without a
+  separate field crossing the boundary.
+- `TinyFlagsRetryPolicy` classifies HTTP status codes and honors `Retry-After` — this is HTTP-only
+  and must stay inside the HTTP implementation. Other transports (Redis, gRPC) have their own
+  retry/deadline shape; the contract must not assume HTTP failure semantics.
+
+### Proposed contracts (three, not two — registration needs its own)
+
+Registration is inherently one-shot request/response regardless of transport — no pull/push
+duality applies to it, unlike values:
+
+```csharp
+public interface IFeatureDefinitionsTransport
+{
+    Task RegisterAsync(IReadOnlyList<FeatureDefinition> definitions, CancellationToken ct);
+}
+```
+
+Values has the pull/push fork discussed 2026-09-21 (polling vs. gRPC-stream/Redis-pub-sub/etcd-watch
+style real-time updates). Two dedicated workers per the user's direction — a polling worker driving
+`IFeatureValuesTransport`'s loop/jitter/backoff itself, and a separate, simpler worker that just
+drains `IFeatureValuesSubscription`'s stream:
+
+```csharp
+public interface IFeatureValuesTransport
+{
+    Task<FeatureValuesResult> GetValuesAsync(IReadOnlyList<FeatureDefinition> catalog,
+        FeatureValuesCursor? current, CancellationToken ct);
+}
+
+public interface IFeatureValuesSubscription
+{
+    IAsyncEnumerable<FeatureValuesResult> WatchAsync(IReadOnlyList<FeatureDefinition> catalog,
+        CancellationToken ct);
+}
+```
+
+`FeatureValuesCursor` would replace today's internal `FeatureSnapshot` as the public cursor type —
+just `EnvironmentId` + `Revision`, no `EntityTag`.
+
+### Open questions for the user to mark up
+
+1. **Packaging — decided 2026-09-22.** Stays inside core `TinyFlags`, no separate NuGet, matching
+   the `TinyEvents` precedent. The three contracts live under `src/TinyFlags/Abstractions/`,
+   matching `TinyEvents`'s own `Abstractions/` folder convention
+   (`ITinyEventPublisher.cs`/`IEventConsumer.cs`) — `IFeatureDefinitionsTransport.cs`,
+   `IFeatureValuesTransport.cs`, `IFeatureValuesSubscription.cs`. `FeatureValuesCursor` moves there
+   too, since it appears directly in the public interface signatures. The HTTP implementation
+   (today's `TinyFlagsApiClient`/`TinyFlagsRetryPolicy`/`FeatureSnapshotReader`) stays where it is,
+   under `Registration/`/`Synchronization/`, just implementing the new interfaces instead of being
+   the only option.
+2. **API surface consequence** — `FeatureSnapshot`/`FeatureValuesResult` are `internal` today.
+   Once an external package implements these interfaces and returns these types, they're
+   permanent public API with real naming/versioning stakes, not private plumbing anymore.
+3. **Registration contract — resolved 2026-09-22.** One `IFeatureDefinitionsTransport` is enough.
+   `TinyFlagsRegistrationWorker` calls it exactly once at boot, no loop — nothing to pull (the
+   catalog is already known locally) and nothing to push (nothing external decides when
+   registration happens). `RegisterAsync` stays `Task`, no revision in or out: today's HTTP
+   contract already returns `204, no body` on success, and revision tracking belongs entirely to
+   the values side by design (`architecture.md`: "registration never mutates `FeatureValues`, and
+   synchronization never waits for registration to complete or succeed"). Checked and ruled out:
+   having `RegisterAsync` return a revision to save a round trip on first sync — no gain, since
+   the values worker's first call already passes `current: null` and fetches unconditionally
+   regardless.
+4. Exact interface/type names above are placeholders, not proposals to lock in.
+
+### Slice breakdown (proposed 2026-09-22, none started)
+
+Per `WORKING-AGREEMENT.md`: each slice still gets its own goal/existing-code/proposed-change
+presentation and explicit approval immediately before it's implemented. This is the ordering, not
+a green light to start coding.
+
+1. **Cursor cleanup — implemented and verified 2026-09-22, awaiting review.** Removed
+   `FeatureSnapshot.EntityTag`; added `FeatureSnapshotEntityTag.Format(Guid, long)` as the single
+   place that derives the tag content from `EnvironmentId`+`Revision`, used by both
+   `FeatureSnapshotReader`'s validation and the outgoing `If-None-Match` header.
+   `FeatureValuesCursor` was **not** introduced here after all — it would sit unused until slice 3
+   actually consumes it in a public interface signature, which is premature per the "abstractions
+   earn their place" rule; deferred to slice 3.
+
+   Real finding, not just mechanical: `docs/protocol.md` fixes `If-None-Match` as a **weak** entity
+   tag (`W/"..."`) — part of the actual wire contract, not an implementation detail. The first cut
+   of the shared helper dropped the `W/` prefix, which would have made the SDK send a strong tag
+   and quietly violate our own documented protocol against the real server. A test asserting the
+   exact outgoing header caught it at build time (compile error led to checking the docs, not the
+   test failing silently) before it could ship. Fixed: the reader's validation compares tag
+   *content* only (the framework already strips `W/` there), the outgoing request always adds
+   `W/` explicitly and unconditionally, matching the documented format rather than echoing
+   whatever was last received. Full suite green: 117 + 181 = 298 passed, 0 warnings.
+2. **Registration transport.** Add `IFeatureDefinitionsTransport` under `Abstractions/`; have
+   `TinyFlagsApiClient`'s registration path implement it; `TinyFlagsRegistrationWorker` depends on
+   the interface, not the concrete class; DI still resolves the HTTP implementation by default.
+   Smallest of the three contracts (no cursor, no result type) — proves the pattern before the
+   more complex values side.
+3. **Values pull transport.** Add `IFeatureValuesTransport` under `Abstractions/`; promote
+   `FeatureValuesResult`/`FeatureValuesCursor` to public (real naming pass happens here, per open
+   question 2); `TinyFlagsSynchronizationWorker` depends on the interface.
+4. **Values push transport + second worker.** Add `IFeatureValuesSubscription`; add the dedicated
+   streaming worker that drains it. No concrete implementation ships — HTTP doesn't do push — this
+   is contract + worker shape only, dormant until someone implements it.
+5. **DI ergonomics.** Design how `AddTinyFlags` lets a caller choose/override the transport
+   elegantly, keeping HTTP as the zero-config default. Needs its own naming/shape discussion
+   (builder vs. overload vs. `.UseTransport<T>()`) before implementing — not decided yet.
+6. **Docs.** Update `architecture.md`/`registration.md`/`value-synchronization.md`/`protocol.md`
+   to describe the contracts, mark `TinyFlags.Server` explicitly as "the reference HTTP
+   implementation," and add a "build your own transport" guide — the actual deliverable for the
+   "we let clever guys do that" goal, since we're shipping seams and docs, not other transports.
