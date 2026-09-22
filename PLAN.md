@@ -1267,3 +1267,32 @@ a green light to start coding.
    `TinyFlags.Server`'s own `PLAN.md`, including the server-side `LISTEN`/`NOTIFY` mechanism and
    both gRPC service implementations — already built, tested, and live-verified there via a real
    `GrpcChannel` against `WebApplicationFactory`'s `TestServer`.
+
+8. **Unblocked 2026-09-22: `TinyFlags.Server`'s gRPC branch merged (PR #2) and released as
+   `ghcr.io/george2006/tinyflags-server:0.2.0`/`:latest`.** CI on that repo had been failing on two
+   sibling-repo filesystem paths only present on the dev machine (`TinyEvents` via `ProjectReference`,
+   `tinyflags.proto` via a relative path into this repo) — fixed by switching `TinyEvents` to its
+   real published NuGet packages (`1.0.0-beta.1`, already on nuget.org) and vendoring a copy of
+   `tinyflags.proto` into `TinyFlags.Server` itself, since that repo is and stays private and can't
+   be reached from CI or from a Docker build context either way. Verified before merge: clean build,
+   200/200 tests (44 unit + 156 integration, real Testcontainers), and a real
+   `docker build -f src/TinyFlags.Server/Dockerfile src/TinyFlags.Server` from the scoped context.
+   Tagged `v0.2.0`, `Release` workflow pushed the image to GHCR — the blocker above is cleared.
+
+   Revised sample scope, decided in discussion the same day: not the two-sample setup this section
+   originally described. Three samples instead, one folder/solution/README each, replacing
+   `samples/MultiService`:
+   - `samples/MultiServiceHttp` — `samples/MultiService`, renamed only (content unchanged): two
+     services sharing one flag over HTTP, the existing multi-service story.
+   - `samples/SingleServiceHttp` — new, one minimal service, `UseHttpTransport`, stripped of the
+     cross-service flag-sharing concern MultiService exists to demonstrate.
+   - `samples/SingleServiceGrpc` — new, same minimal shape as the above but `UseGrpcTransport`,
+     the first sample proving the push/`IFeatureValuesSubscription` path end-to-end against a
+     released (not locally-built) server image.
+
+   Rationale: MultiService was teaching two things at once (cross-service flag sharing, and "how do
+   I wire transport X") — splitting means someone who only wants "how do I wire gRPC" doesn't have
+   to parse `OrdersService`/`PaymentsService`/`SharedPromotions.cs` to find it. Doc links in
+   `docs/multi-service-flags.md` and `docs/getting-started.md` (×2) need updating alongside the
+   rename — not a separate cleanup pass. Not started as of this note; three reviewable slices, one
+   per sample, each stopping for review before the next.

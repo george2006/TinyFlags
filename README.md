@@ -124,7 +124,7 @@ and authentication.
 - [Server Protocol (HTTP)](docs/protocol.md)
 - [Building a Transport](docs/building-a-transport.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
-- [Multi-Service Sample](samples/MultiService/README.md) — a runnable walkthrough, two services and a Dockerized server
+- [Multi-Service HTTP Sample](samples/MultiServiceHttp/README.md) — a runnable walkthrough, two services and a Dockerized server
 - [Diagnostics](docs/diagnostics.md)
 - [Tiny suite](docs/tiny-suite.md)
 

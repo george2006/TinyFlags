@@ -117,6 +117,6 @@ instance observes updates automatically. No re-resolution needed.
 To try Option B or C end to end, you need a running server and an issued API key: either
 [`TinyFlags.Server`](https://github.com/george2006/TinyFlags.Server), the reference
 implementation, or your own, speaking the same wire contracts ([HTTP](protocol.md) or
-`tinyflags.proto` for gRPC). See the [Multi-Service Sample](../samples/MultiService/README.md) for
+`tinyflags.proto` for gRPC). See the [Multi-Service HTTP Sample](../samples/MultiServiceHttp/README.md) for
 a runnable walkthrough (HTTP today — a gRPC sample is planned once `TinyFlags.Server`'s gRPC
 support ships as a published image).

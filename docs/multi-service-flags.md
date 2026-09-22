@@ -62,7 +62,7 @@ people, not the generator.
 
 ## Try it
 
-[`samples/MultiService`](../samples/MultiService/README.md) runs two independent services against
+[`samples/MultiServiceHttp`](../samples/MultiServiceHttp/README.md) runs two independent services against
 a Dockerized `TinyFlags.Server`, each with its own private flag plus one identical, shared
 declaration. `docker compose up`, then flip the shared value in the admin dashboard: `curl` both
 services' `/flags` endpoint and watch them agree.

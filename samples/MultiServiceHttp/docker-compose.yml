@@ -64,7 +64,7 @@ services:
   orders-service:
     build:
       context: ../../.
-      dockerfile: samples/MultiService/OrdersService/Dockerfile
+      dockerfile: samples/MultiServiceHttp/OrdersService/Dockerfile
     network_mode: "service:tinyflags-server"
     environment:
       ASPNETCORE_URLS: "http://+:8081"
@@ -80,7 +80,7 @@ services:
   payments-service:
     build:
       context: ../../.
-      dockerfile: samples/MultiService/PaymentsService/Dockerfile
+      dockerfile: samples/MultiServiceHttp/PaymentsService/Dockerfile
     network_mode: "service:tinyflags-server"
     environment:
       ASPNETCORE_URLS: "http://+:8082"

@@ -1,4 +1,4 @@
-# Multi-service sample
+# Multi-service HTTP sample
 
 Two independent HTTP services, `OrdersService` and `PaymentsService`, each with their own private
 flag, plus one flag both declare identically and therefore share — backed by a real
@@ -18,7 +18,7 @@ flag is shared purely because both declarations produce the same identity — se
 ## 1. Start everything
 
 ```shell
-cd samples/MultiService
+cd samples/MultiServiceHttp
 docker compose up -d --wait --build
 ```
 
