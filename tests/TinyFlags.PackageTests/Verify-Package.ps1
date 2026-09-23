@@ -18,13 +18,13 @@ dotnet pack (Join-Path $repository 'src/TinyFlags/TinyFlags.csproj') -c Release 
 if ($LASTEXITCODE -ne 0) { throw 'Package creation failed.' }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$package = Join-Path $feed "TinyFlags.$version.nupkg"
+$package = Join-Path $feed "TinySuite.TinyFlags.$version.nupkg"
 $archive = [System.IO.Compression.ZipFile]::OpenRead($package)
 try {
     foreach ($expected in @('lib/net8.0/TinyFlags.dll', 'analyzers/dotnet/cs/TinyFlags.SourceGen.dll', 'README.md')) {
         if ($null -eq $archive.GetEntry($expected)) { throw "Missing package asset: $expected" }
     }
-    $reader = [System.IO.StreamReader]::new($archive.GetEntry('TinyFlags.nuspec').Open())
+    $reader = [System.IO.StreamReader]::new($archive.GetEntry('TinySuite.TinyFlags.nuspec').Open())
     try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
     $dependencies = @($manifest.SelectNodes("//*[local-name()='dependency']") | ForEach-Object { $_.id })
     $expectedDependencies = @('Microsoft.Extensions.DependencyInjection.Abstractions', 'Microsoft.Extensions.Hosting.Abstractions')
@@ -52,7 +52,7 @@ $escapedFeed = [System.Security.SecurityElement]::Escape($feed)
   </packageSources>
   <packageSourceMapping>
     <clear />
-    <packageSource key="local"><package pattern="TinyFlags" /></packageSource>
+    <packageSource key="local"><package pattern="TinySuite.TinyFlags" /></packageSource>
     <packageSource key="nuget.org"><package pattern="*" /></packageSource>
   </packageSourceMapping>
 </configuration>

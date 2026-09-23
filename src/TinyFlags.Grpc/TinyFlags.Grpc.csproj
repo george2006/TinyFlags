@@ -4,8 +4,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
+    <!-- NuGet distribution identity only - see TinyFlags.csproj's PackageId comment. -->
+    <PackageId>TinySuite.TinyFlags.Grpc</PackageId>
     <Description>The reference gRPC transport for TinyFlags - real-time value updates and independent registration, speaking the documented tinyflags.proto contract against TinyFlags.Server or your own implementation.</Description>
     <PackageTags>feature-flags;grpc;dotnet;tinyflags</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <PropertyGroup>
@@ -34,6 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="../TinyFlags/TinyFlags.csproj" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
     <Protobuf Include="Protos/tinyflags.proto" GrpcServices="Client" />

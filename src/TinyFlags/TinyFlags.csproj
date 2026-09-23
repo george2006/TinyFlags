@@ -4,8 +4,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
+    <!-- NuGet distribution identity only - "TinyFlags" on nuget.org already belongs to another
+         publisher. The product, namespaces, and every public type stay TinyFlags. -->
+    <PackageId>TinySuite.TinyFlags</PackageId>
     <Description>Typed feature flag declarations for TinyFlags.</Description>
     <PackageTags>feature-flags;source-generator;dotnet;dependency-injection;tinyflags</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <PropertyGroup>
@@ -35,6 +39,7 @@
   <ItemGroup>
     <ProjectReference Include="../TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
     <None Include="../TinyFlags.SourceGen/bin/$(Configuration)/netstandard2.0/TinyFlags.SourceGen.dll"
           Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>

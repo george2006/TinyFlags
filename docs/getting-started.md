@@ -9,7 +9,7 @@ Not yet published to NuGet.org. Pack and reference it locally:
 
 ```bash
 dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
-dotnet add package TinyFlags --source artifacts/packages
+dotnet add package TinySuite.TinyFlags --source artifacts/packages
 ```
 
 ## 2) Declare a flag provider

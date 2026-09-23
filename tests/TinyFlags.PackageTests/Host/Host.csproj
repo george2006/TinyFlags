@@ -7,7 +7,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="TinyFlags" Version="0.1.0-dev" />
+    <PackageReference Include="TinySuite.TinyFlags" Version="0.1.0-dev" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <ProjectReference Include="../Library/Library.csproj" />
     <Compile Include="InvalidFlags.cs.template" Condition="'$(IncludeInvalidFlags)' == 'true'" />

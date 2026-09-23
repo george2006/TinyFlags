@@ -31,15 +31,15 @@ locally:
 
 ```bash
 dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
-dotnet add package TinyFlags --source artifacts/packages
+dotnet add package TinySuite.TinyFlags --source artifacts/packages
 
 # Pick a transport - only needed if you're connecting to a server (talking to TinyFlags.Server or your own):
 dotnet pack src/TinyFlags.Http/TinyFlags.Http.csproj -c Release -o artifacts/packages
-dotnet add package TinyFlags.Http --source artifacts/packages
+dotnet add package TinySuite.TinyFlags.Http --source artifacts/packages
 
 # ...or, for real-time push instead of polling:
 dotnet pack src/TinyFlags.Grpc/TinyFlags.Grpc.csproj -c Release -o artifacts/packages
-dotnet add package TinyFlags.Grpc --source artifacts/packages
+dotnet add package TinySuite.TinyFlags.Grpc --source artifacts/packages
 ```
 
 ## Quick start

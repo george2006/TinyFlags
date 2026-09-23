@@ -48,7 +48,7 @@ jobs:
           echo "Git tag version: $VERSION"
           echo "Artifacts:"
           ls -la ./artifacts
-          for PACKAGE_ID in TinyFlags TinyFlags.Http TinyFlags.Grpc; do
+          for PACKAGE_ID in TinySuite.TinyFlags TinySuite.TinyFlags.Http TinySuite.TinyFlags.Grpc; do
             if [ ! -f "./artifacts/${PACKAGE_ID}.${VERSION}.nupkg" ]; then
               echo "ERROR: Expected ./artifacts/${PACKAGE_ID}.${VERSION}.nupkg but it was not found."
               exit 1
