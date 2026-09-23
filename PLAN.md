@@ -1312,3 +1312,51 @@ a green light to start coding.
 
    `README.md` and `docs/getting-started.md` updated to link all three samples and drop the
    now-stale "gRPC sample is planned" line — gRPC shipped this session.
+
+## Today (2026-09-23): pre-public consolidation pass — not yet started
+
+Yesterday shipped the feature (gRPC transport, `TinyFlags.Server` released, three samples). Today
+is deliberately not a feature day: the user set the goal of going public with this repo by the end
+of the week, and wants a consolidation pass first, reviewing every file under `src/` (~45 files,
+excluding generated `obj/`, across the four projects) as if handing it to another principal
+engineer to read cold. Framed by the user as two sequential steps, each broken into small,
+reviewable slices per `WORKING-AGREEMENT.md` rather than one uninterrupted sweep:
+
+**Step 1 — documentation.** Every file gets read for whether a newcomer could follow it: accurate
+XML doc comments on public API, inline comments that explain *why* (a constraint, a tradeoff, a
+non-obvious decision) rather than narrating *what* the code already says, consistent with the
+existing standard already followed by the more heavily-commented files in this codebase (e.g.
+`TinyFlagsGrpcOptions.Validate`, `FeatureSnapshotEntityTag`). Not a rewrite pass — additive/
+corrective only, no behavior changes. Includes two specific asks:
+
+- `README.md`'s opening needs two strong sentences stating the actual thesis, not just "typed
+  feature flags for .NET": TinyFlags is an open-source SDK that removes vendor lock-in on feature
+  flags — the transport contracts (`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`/
+  `IFeatureValuesSubscription`) mean a team can implement their own transport for whatever
+  provider or backend they already use, instead of being tied to one vendor's SDK and one vendor's
+  server.
+- Every public type/member across the four projects gets a real doc comment where it's missing one
+  or has a weak one.
+
+Proposed slices, one project per slice (doc pass only touches comments, so faster per-file than
+step 2 — still stopping for review after each):
+1. `README.md` opening (the two sentences) — small, standalone, first.
+2. `src/TinyFlags` (core: `Abstractions/`, `DependencyInjection/`, `Registration/`,
+   `Synchronization/`, root types) — 16 files.
+3. `src/TinyFlags.Http` — 6 files.
+4. `src/TinyFlags.Grpc` — 3 files.
+5. `src/TinyFlags.SourceGen` — 20 files across `Analysis/`, `Discovery/`, `Diagnostics/`,
+   `Generation/`, `Model/`, `Validation/`.
+
+**Step 2 — code smells and clever code.** A second pass over the same four projects, this time
+reading for `WORKING-AGREEMENT.md`'s engineering standard rather than doc coverage: overclever
+one-liners, unnecessary abstraction, methods doing more than one job, unclear names, anything that
+would make a reviewer stop and reread it twice. Per the working agreement, any abstraction found to
+be unjustified gets flagged for discussion, not silently removed — and any new abstraction proposed
+as a fix still needs the 4-point ritual before being introduced. Same per-project slice breakdown
+as step 1, run after step 1 is fully approved.
+
+Not started as of this note. No behavior changes are in scope for either step — this is a
+readability/publishability pass, not a feature or a refactor. If a step 2 review surfaces an actual
+bug (not just a smell), stop and raise it separately rather than folding a behavior fix into a
+cleanup commit.
