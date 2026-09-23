@@ -7,7 +7,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: nuget-prod
+    environment: production
     permissions:
       contents: write
       id-token: write # enables GitHub OIDC token issuance, needed for NuGet Trusted Publishing
