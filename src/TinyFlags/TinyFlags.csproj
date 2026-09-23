@@ -5,7 +5,25 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
     <Description>Typed feature flag declarations for TinyFlags.</Description>
+    <PackageTags>feature-flags;source-generator;dotnet;dependency-injection;tinyflags</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageReleaseNotes>
+      TinyFlags 0.1.0-alpha.1
+
+      Added
+      - Typed feature-flag declarations via IFeatureProvider, with compile-time-generated access classes.
+      - Local-only FeatureValues store, or connect to a server through a transport package.
+      - Transport contracts (IFeatureDefinitionsTransport, IFeatureValuesTransport, IFeatureValuesSubscription)
+        any package can implement - see TinyFlags.Http and TinyFlags.Grpc for two real examples.
+      - Multi-assembly catalog composition via TinyFlagsBootstrap.
+      - Source-generator diagnostics (TFG001-TFG005) for unsupported declarations.
+
+      Compatibility
+      - Early alpha: API surface, especially the transport contracts, may still change before 1.0.
+      - Upgrade TinyFlags, TinyFlags.Http and TinyFlags.Grpc together.
+    </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />

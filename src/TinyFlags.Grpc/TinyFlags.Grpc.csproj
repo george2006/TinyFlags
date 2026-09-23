@@ -4,8 +4,23 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
-    <Description>The gRPC push-transport sample for TinyFlags - real-time value updates and independent registration, speaking the documented tinyflags.proto contract against TinyFlags.Server or your own implementation.</Description>
+    <Description>The reference gRPC transport for TinyFlags - real-time value updates and independent registration, speaking the documented tinyflags.proto contract against TinyFlags.Server or your own implementation.</Description>
+    <PackageTags>feature-flags;grpc;dotnet;tinyflags</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageReleaseNotes>
+      TinyFlags.Grpc 0.1.0-alpha.1
+
+      Added
+      - Reference gRPC transport: registration plus real-time push value synchronization over a Watch stream.
+      - Automatic reconnect on transient failures; permanent failures surface as TinyFlagsClientException.
+      - Strict response validation, consistent with the HTTP transport's failure classification (docs/grpc-protocol.md).
+
+      Compatibility
+      - Early alpha, matches TinyFlags's contract version.
+      - Upgrade TinyFlags, TinyFlags.Http and TinyFlags.Grpc together.
+    </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />

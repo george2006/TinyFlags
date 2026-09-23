@@ -5,7 +5,22 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Version>0.1.0-dev</Version>
     <Description>The reference HTTP transport for TinyFlags, speaking the documented wire protocol against TinyFlags.Server or your own implementation.</Description>
+    <PackageTags>feature-flags;http;dotnet;tinyflags</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageReleaseNotes>
+      TinyFlags.Http 0.1.0-alpha.1
+
+      Added
+      - Reference HTTP transport: registration plus polling value synchronization with conditional GET/ETag.
+      - Retry with jittered exponential backoff, honoring Retry-After.
+      - Strict response validation against the documented wire contract (docs/protocol.md).
+
+      Compatibility
+      - Early alpha, matches TinyFlags's contract version.
+      - Upgrade TinyFlags, TinyFlags.Http and TinyFlags.Grpc together.
+    </PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
