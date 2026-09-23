@@ -197,13 +197,16 @@ a deliberate non-goal, not a missing feature.
 ## Test Coverage & Hardening
 
 TinyFlags is verified with real collaborators, not mocks: real Roslyn compilations for the
-generator, and a real loopback HTTP server for the SDK's registration/synchronization workers.
+generator, a real loopback HTTP server for `TinyFlags.Http`, and a real gRPC server (Kestrel,
+HTTP/2) for `TinyFlags.Grpc`.
 
 | Component | Tests |
 | --- | --- |
+| Core (`TinyFlags`) | 25 |
 | Source generator | 117 |
-| SDK runtime | 181 |
-| **Total** | **298** |
+| HTTP transport | 160 |
+| gRPC transport | 35 |
+| **Total** | **337** |
 
 Run everything:
 
@@ -224,7 +227,9 @@ src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
 tests/TinyFlags.Tests
 tests/TinyFlags.Http.Tests
 tests/TinyFlags.Grpc.Tests
+tests/TinyFlags.Grpc.TestServer Real gRPC server for TinyFlags.Grpc.Tests, not a mock
 tests/TinyFlags.SourceGen.Tests
+tests/TinyFlags.PackageTests    Verifies the packaged generator against a real restore
 ```
 
 See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).
