@@ -1,6 +1,9 @@
 # TinyFlags
 
-Typed feature flag declarations for .NET.
+TinyFlags is an open-source feature-flag SDK for .NET, built so changing your flag provider is a
+week of work, not a migration project. Flags are typed C# declarations you own, not rows in
+someone else's dashboard — the transport that syncs their values is a public contract, so swapping
+providers means writing a new transport, not rewriting every flag in your codebase.
 
 The code brings the flags. The server only serves their values.
 
@@ -12,8 +15,8 @@ The code brings the flags. The server only serves their values.
   values for flags that already exist; it never originates one.
 - **Local-only or server-synced** — run entirely in-process with `FeatureValues`, or connect to
   `TinyFlags.Server` for centrally managed values.
-- **Revisioned, conditional sync** — the SDK polls on a jittered interval using conditional GET
-  (`ETag`); unchanged values cost a 304 with no body.
+- **Revisioned sync** — every value snapshot carries a revision, so a transport can tell you
+  "nothing changed" cheaply instead of resending values you already have.
 - **Resilient by default** — transient failures retry with backoff; a server outage or malformed
   response falls back to the last known values, never to an exception.
 - **Multi-assembly composition** — each assembly contributes its own flag catalog; the host
@@ -30,9 +33,13 @@ locally:
 dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
 dotnet add package TinyFlags --source artifacts/packages
 
-# Only if you want the reference HTTP transport (talking to TinyFlags.Server or your own):
+# Pick a transport - only needed if you're connecting to a server (talking to TinyFlags.Server or your own):
 dotnet pack src/TinyFlags.Http/TinyFlags.Http.csproj -c Release -o artifacts/packages
 dotnet add package TinyFlags.Http --source artifacts/packages
+
+# ...or, for real-time push instead of polling:
+dotnet pack src/TinyFlags.Grpc/TinyFlags.Grpc.csproj -c Release -o artifacts/packages
+dotnet add package TinyFlags.Grpc --source artifacts/packages
 ```
 
 ## Quick start
@@ -66,8 +73,12 @@ bool enabled = flags.NuevoCheckout; // false, the declared default
 ```
 
 That is local-only: flags read their declared defaults, with no network calls. To connect to a
-`TinyFlags.Server` environment and receive centrally managed values, also reference the
-[TinyFlags.Http](src/TinyFlags.Http) package, the reference transport:
+`TinyFlags.Server` environment and receive centrally managed values, pick a transport — both are
+independent reference implementations of the same contracts
+(`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`, `IFeatureValuesSubscription`, in the
+core package):
+
+[TinyFlags.Http](src/TinyFlags.Http) — polling with conditional `GET`:
 
 ```csharp
 builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
@@ -77,11 +88,19 @@ builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(options =>
 }));
 ```
 
-This registers your assemblies' declared flags with the server in the background after startup,
-and keeps values synchronized on a recurring interval. HTTP is just one implementation of
-TinyFlags' transport contracts (`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`,
-`IFeatureValuesSubscription`, in the core package) — see
-[Getting Started](docs/getting-started.md) for the complete walkthrough.
+[TinyFlags.Grpc](src/TinyFlags.Grpc) — real-time push, no polling interval:
+
+```csharp
+builder.Services.AddTinyFlags(tinyFlags => tinyFlags.UseGrpcTransport(options =>
+{
+    options.Endpoint = new Uri(builder.Configuration["TinyFlags:Endpoint"]!);
+    options.ApiKey = builder.Configuration["TinyFlags:ApiKey"];
+}));
+```
+
+Either way, this registers your assemblies' declared flags with the server in the background after
+startup and keeps values synchronized — see [Getting Started](docs/getting-started.md) for the
+complete walkthrough.
 
 ## Supported declarations
 
@@ -122,6 +141,7 @@ and authentication.
 - [Registration](docs/registration.md)
 - [Value Synchronization](docs/value-synchronization.md)
 - [Server Protocol (HTTP)](docs/protocol.md)
+- [Server Protocol (gRPC)](docs/grpc-protocol.md)
 - [Building a Transport](docs/building-a-transport.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Single-Service HTTP Sample](samples/SingleServiceHttp/README.md) — one service, one flag, polling over HTTP
@@ -198,10 +218,12 @@ verification script.
 
 ```text
 src/TinyFlags                  Marker, local values, catalog composition, transport contracts (net8.0)
-src/TinyFlags.Http              Reference HTTP transport implementation (net8.0)
+src/TinyFlags.Http             Reference HTTP transport implementation (net8.0)
+src/TinyFlags.Grpc             Reference gRPC transport implementation (net8.0)
 src/TinyFlags.SourceGen        Incremental generator (netstandard2.0)
 tests/TinyFlags.Tests
 tests/TinyFlags.Http.Tests
+tests/TinyFlags.Grpc.Tests
 tests/TinyFlags.SourceGen.Tests
 ```
 

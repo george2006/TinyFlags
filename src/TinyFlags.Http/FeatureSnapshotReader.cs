@@ -11,6 +11,11 @@ using System.Threading.Tasks;
 
 namespace TinyFlags;
 
+/// <summary>
+/// Enforces docs/protocol.md's response contract byte-for-byte: bounded reads, strict JSON shape,
+/// and the ETag/revision consistency rule. Rejects anything that doesn't match rather than
+/// degrading gracefully - a malformed response is a protocol error, not a value to guess at.
+/// </summary>
 internal sealed class FeatureSnapshotReader
 {
     private readonly int maxSnapshotBytes;

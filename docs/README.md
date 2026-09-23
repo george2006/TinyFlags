@@ -28,6 +28,7 @@ Core docs:
 - [Registration](registration.md)
 - [Value Synchronization](value-synchronization.md)
 - [Server Protocol (HTTP)](protocol.md)
+- [Server Protocol (gRPC)](grpc-protocol.md)
 - [Building a Transport](building-a-transport.md)
 - [Sharing a Flag Across Services](multi-service-flags.md)
 - [Diagnostics](diagnostics.md)

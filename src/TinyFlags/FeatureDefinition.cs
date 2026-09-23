@@ -7,6 +7,9 @@ namespace TinyFlags;
 /// </summary>
 public sealed class FeatureDefinition
 {
+    /// <summary>
+    /// The flag's identity: the fully qualified provider type name plus the property name.
+    /// </summary>
     public string Key { get; }
 
     public FeatureKind Kind { get; }
@@ -16,11 +19,18 @@ public sealed class FeatureDefinition
     /// </summary>
     public object DefaultValue { get; }
 
+    /// <summary>
+    /// Creates a <see cref="FeatureKind.Boolean"/> definition.
+    /// </summary>
     public static FeatureDefinition Boolean(string key, bool defaultValue)
     {
         return new FeatureDefinition(key, FeatureKind.Boolean, defaultValue);
     }
 
+    /// <summary>
+    /// Creates a <see cref="FeatureKind.String"/> definition. <paramref name="defaultValue"/> must
+    /// be non-null; empty is fine.
+    /// </summary>
     public static FeatureDefinition String(string key, string defaultValue)
     {
         ArgumentNullException.ThrowIfNull(defaultValue);

@@ -9,6 +9,11 @@ using TinyFlags.SourceGen.Model;
 
 namespace TinyFlags.SourceGen.Analysis;
 
+/// <summary>
+/// Resolves one syntax candidate's symbol and produces a plain <see cref="FeatureProviderAnalysis"/> -
+/// the boundary where Roslyn symbols stop: every type after this phase is our own data, so
+/// downstream Validation/Generation carry no Roslyn dependency.
+/// </summary>
 internal sealed class FeatureProviderAnalyzer
 {
     public FeatureProviderAnalysis? Analyze(

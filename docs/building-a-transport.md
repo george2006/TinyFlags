@@ -161,7 +161,7 @@ the credential-leak risk is the same regardless of which wire format carries it.
 
 - [Registration](registration.md), [Value Synchronization](value-synchronization.md) — the
   worker-level behavior every transport plugs into, described transport-agnostically
-- [Server Protocol](protocol.md) — the HTTP wire contract, if you're implementing the *server*
-  side instead of the client side
+- [Server Protocol (HTTP)](protocol.md), [Server Protocol (gRPC)](grpc-protocol.md) — the wire
+  contracts, if you're implementing the *server* side instead of the client side
 - `src/TinyFlags.Http` and `src/TinyFlags.Grpc` — two complete, real implementations to read
   alongside this page

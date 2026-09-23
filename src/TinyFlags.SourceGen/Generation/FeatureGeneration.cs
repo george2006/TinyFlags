@@ -6,6 +6,11 @@ using TinyFlags.SourceGen.Model;
 
 namespace TinyFlags.SourceGen.Generation;
 
+/// <summary>
+/// Thin facade over Planning and Emission for both generated outputs - one provider's access
+/// class, and the per-assembly catalog - so TinyFlagsSourceGenerator only ever talks to this one
+/// entry point rather than the planner/emitter pairs directly.
+/// </summary>
 internal sealed class FeatureGeneration
 {
     public (string HintName, string Source) Generate(

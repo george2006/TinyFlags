@@ -5,6 +5,11 @@ using TinyFlags.SourceGen.Model;
 
 namespace TinyFlags.SourceGen.Analysis;
 
+/// <summary>
+/// Checks whether user code already occupies the generated catalog's reserved name
+/// (<c>TinyFlags.Generated.ThisAssemblyFeatureCatalog</c>) - reports TFG005 if so, since the
+/// generator would otherwise silently fail to add its own declaration alongside a conflicting one.
+/// </summary>
 internal static class FeatureCatalogAnalyzer
 {
     public static FeatureIssue? Analyze(Compilation compilation, CancellationToken cancellationToken)
@@ -22,6 +27,10 @@ internal static class FeatureCatalogAnalyzer
         return new FeatureIssue("TFG005", conflict.Name, source);
     }
 
+    // Walked segment by segment rather than one GetTypeByMetadataName("TinyFlags.Generated.
+    // ThisAssemblyFeatureCatalog") call: a single lookup would miss a conflict where an earlier
+    // segment (e.g. "TinyFlags" itself) is already a type instead of a namespace, which blocks the
+    // generated declaration just as much as a conflict at the final segment does.
     private static ISymbol? FindNameConflict(INamespaceSymbol assemblyNamespace)
     {
         var tinyFlagsType = FindTypeMember(assemblyNamespace, "TinyFlags");

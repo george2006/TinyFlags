@@ -4,6 +4,13 @@ using System.Threading;
 
 namespace TinyFlags;
 
+/// <summary>
+/// Local snapshot store backing every generated <c>XxxFeatureFlags</c> access class: typed reads
+/// with default fallback, and atomic snapshot replacement. One shared singleton per container,
+/// registered by <see cref="TinyFlagsServiceCollectionExtensions.AddTinyFlags"/>. A missing key or
+/// a stored value of the wrong type both fall back to the caller's default rather than throwing -
+/// there is no distinction between "never synced" and "server doesn't know this key."
+/// </summary>
 public sealed class FeatureValues
 {
     private Dictionary<string, object> snapshot = new(StringComparer.Ordinal);
@@ -19,6 +26,11 @@ public sealed class FeatureValues
         return ReadValue(key, defaultValue);
     }
 
+    /// <summary>
+    /// Atomically replaces every value with a fresh snapshot. Readers never observe a partial
+    /// update - either the old snapshot or the new one, never a mix - and the previous snapshot is
+    /// simply discarded, not merged with the new one.
+    /// </summary>
     public void ReplaceSnapshot(IReadOnlyDictionary<string, object> values)
     {
         ArgumentNullException.ThrowIfNull(values);

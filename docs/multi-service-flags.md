@@ -44,9 +44,9 @@ because it is one row on the server, not two.
 Registration is idempotent for this case: replaying the same key with the same `Kind` and the same
 declared default is a no-op, not a conflict, no matter which service registers first or how many
 times. If the two declarations disagree — different type (`bool` vs `string`) or a different
-default — that *is* a conflict: the whole registering batch is rejected with a 409 and
-`conflictingKeys`, exactly as it would be for any other definition mismatch. See
-[Registration](registration.md#http-contract) for the exact rule.
+default — that *is* a conflict: the whole registering batch is rejected (`409` over HTTP,
+`AlreadyExists` over gRPC), exactly as it would be for any other definition mismatch. See
+[Registration](registration.md) for the exact rule.
 
 ## Making it intentional, not accidental
 

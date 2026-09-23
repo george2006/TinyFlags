@@ -1312,3 +1312,111 @@ a green light to start coding.
 
    `README.md` and `docs/getting-started.md` updated to link all three samples and drop the
    now-stale "gRPC sample is planned" line — gRPC shipped this session.
+
+## Today (2026-09-23): pre-public consolidation pass — not yet started
+
+Yesterday shipped the feature (gRPC transport, `TinyFlags.Server` released, three samples). Today
+is deliberately not a feature day: the user set the goal of going public with this repo by the end
+of the week, and wants a consolidation pass first, reviewing every file under `src/` (~45 files,
+excluding generated `obj/`, across the four projects) as if handing it to another principal
+engineer to read cold. Framed by the user as two sequential steps, each broken into small,
+reviewable slices per `WORKING-AGREEMENT.md` rather than one uninterrupted sweep:
+
+**Step 1 — documentation.** Every file gets read for whether a newcomer could follow it: accurate
+XML doc comments on public API, inline comments that explain *why* (a constraint, a tradeoff, a
+non-obvious decision) rather than narrating *what* the code already says, consistent with the
+existing standard already followed by the more heavily-commented files in this codebase (e.g.
+`TinyFlagsGrpcOptions.Validate`, `FeatureSnapshotEntityTag`). Not a rewrite pass — additive/
+corrective only, no behavior changes. Includes two specific asks:
+
+- `README.md`'s opening needs two strong sentences stating the actual thesis, not just "typed
+  feature flags for .NET": TinyFlags is an open-source SDK that removes vendor lock-in on feature
+  flags — the transport contracts (`IFeatureDefinitionsTransport`, `IFeatureValuesTransport`/
+  `IFeatureValuesSubscription`) mean a team can implement their own transport for whatever
+  provider or backend they already use, instead of being tied to one vendor's SDK and one vendor's
+  server.
+- Every public type/member across the four projects gets a real doc comment where it's missing one
+  or has a weak one.
+
+Proposed slices, one project per slice (doc pass only touches comments, so faster per-file than
+step 2 — still stopping for review after each):
+1. `README.md` opening (the two sentences) — small, standalone, first.
+2. `src/TinyFlags` (core: `Abstractions/`, `DependencyInjection/`, `Registration/`,
+   `Synchronization/`, root types) — 16 files.
+3. `src/TinyFlags.Http` — 6 files.
+4. `src/TinyFlags.Grpc` — 3 files.
+5. `src/TinyFlags.SourceGen` — 20 files across `Analysis/`, `Discovery/`, `Diagnostics/`,
+   `Generation/`, `Model/`, `Validation/`.
+
+**Step 2 — code smells and clever code.** A second pass over the same four projects, this time
+reading for `WORKING-AGREEMENT.md`'s engineering standard rather than doc coverage: overclever
+one-liners, unnecessary abstraction, methods doing more than one job, unclear names, anything that
+would make a reviewer stop and reread it twice. Per the working agreement, any abstraction found to
+be unjustified gets flagged for discussion, not silently removed — and any new abstraction proposed
+as a fix still needs the 4-point ritual before being introduced. Same per-project slice breakdown
+as step 1, run after step 1 is fully approved.
+
+Not started as of this note. No behavior changes are in scope for either step — this is a
+readability/publishability pass, not a feature or a refactor. If a step 2 review surfaces an actual
+bug (not just a smell), stop and raise it separately rather than folding a behavior fix into a
+cleanup commit.
+
+Slice 1 (README) done 2026-09-23: softened the opening's tone after review, generalized the
+`ETag`/conditional-GET bullet since it's HTTP-only detail in a transport-agnostic feature list, and
+gave `TinyFlags.Grpc` the same README treatment `TinyFlags.Http` already had (install instructions,
+Quick start sample, Components line) — all missing since gRPC shipped.
+
+Slice 2 (`docs/grpc-protocol.md`) done 2026-09-23: closed the gap found while reviewing slice 1 —
+`docs/protocol.md` documented the HTTP wire contract for someone implementing their own server, but
+gRPC only had the raw `.proto` file. Added `docs/grpc-protocol.md`, mirroring `protocol.md`'s exact
+structure (services/methods, wire shapes, error-status mapping, what's fixed vs. yours to design),
+sourced from the real contract (`tinyflags.proto`) and the real client mapping
+(`TinyFlagsGrpcTransport.ToFailure`/`IsTransient`), not guessed. Linked from every place
+`protocol.md` was previously linked alone: `docs/README.md`, `README.md`,
+`building-a-transport.md`'s "See also", `getting-started.md`.
+
+## Future to-do (raised 2026-09-23, not scheduled): release train for TinyFlags and its transports
+
+The user wants a real release process (a "release train") for this repo and its transport
+packages (`TinyFlags`, `TinyFlags.Http`, `TinyFlags.Grpc`) once it's public — presumably versioning
+and publishing all three to NuGet.org together or on a coordinated cadence, similar in spirit to
+how `TinyEvents` already has a real `release.yml` publishing multiple packages from one tag. Not
+discussed in any detail yet: whether the three packages version together or independently, what
+triggers a release, or how this relates to `TinyFlags.Server`'s already-existing separate release
+pipeline in its own repo. Explicitly deferred — not part of today's consolidation pass.
+
+## Consolidation pass — done 2026-09-23
+
+Both steps complete across all four `src/` projects, each its own reviewed slice, all on `main`.
+
+**Step 1 (docs).** README reworked (vendor-lock-in-free positioning, "changing your flag provider
+is a week of work, not a migration project"), HTTP and gRPC given equal footing everywhere gRPC had
+been left second-class since it shipped, `docs/grpc-protocol.md` added (gRPC had no
+server-implementer's guide, only the raw `.proto`), stale HTTP-only assumptions fixed in
+`architecture.md`/`registration.md`/`multi-service-flags.md` (a broken anchor, a `409` cited as
+universal when it's HTTP-specific). Every project's XML doc gaps closed — `FeatureValues`,
+`FeatureValuesResult`, `TinyFlagsClientException`/`Failure`, all three workers, `TinyFlagsApiClient`/
+`FeatureSnapshotReader`, and six SourceGen internal types all had none before today.
+
+**Step 2 (smells), real fixes, not just comments:**
+- Extracted the `TaskCompletionSource`/`ApplicationStarted.Register` race duplicated identically
+  across all three workers, into one extension method (`HostApplicationLifetimeExtensions.
+  WaitForApplicationStartedAsync`) — landed on that shape only after rejecting both inheritance
+  (no custom base classes exist anywhere else in this codebase) and a vague "helper" class, per the
+  user's standing rule that reaching for "helper" is itself the smell.
+- Extracted the idempotent-registration dance `UseHttpTransport`/`UseGrpcTransport` each
+  duplicated across two separate packages, into `RegisterSingletonOnce<T>` on `IServiceCollection` —
+  deliberately not a member on `TinyFlagsOptions`, which stays exactly what it always was: a
+  placeholder holding only `Services`.
+- Found and fixed a real consistency bug, not just a style issue: `TinyFlagsGrpcTransport.ToResult`
+  let a malformed `environment_id` or duplicate keys throw unclassified exceptions, where the HTTP
+  side already correctly classified the equivalent failures as `InvalidResponse`. Discovering this
+  also surfaced that `TinyFlagsGrpcTransport` itself had zero automated test coverage (only its
+  options were tested) — closed with a real gRPC test server
+  (`tests/TinyFlags.Grpc.TestServer`), not mocks, and 15 new tests proving registration's status
+  mapping, watch's reconnect/stop split, and the fix itself.
+- Named a duplicated magic number (`TinyFlagsRetryPolicy`'s backoff-attempt cap, `31` in two places).
+
+Full solution: 329 tests (25 core + 27 gRPC + 117 source-gen + 160 HTTP), 0 failures, warnings as
+errors, at every commit along the way. No behavior changes outside the fixes explicitly called out
+above — everything else was additive documentation or a mechanical, verified extraction.

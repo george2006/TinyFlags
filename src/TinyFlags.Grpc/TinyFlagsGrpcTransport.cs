@@ -32,7 +32,10 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
         {
             // Only ever reached for loopback (Validate() rejects http elsewhere) - .NET's
             // HttpClient otherwise silently refuses to even attempt HTTP/2 over plain http://,
-            // which fails every call with no useful error pointing at why.
+            // which fails every call with no useful error pointing at why. This switch is
+            // process-wide, not scoped to this channel - setting it here also enables cleartext
+            // HTTP/2 for any other HttpClient in the same process, an unavoidable consequence of
+            // .NET not offering a per-handler equivalent.
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
         }
         channel = GrpcChannel.ForAddress(options.Endpoint);
@@ -82,6 +85,12 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
         }
     }
 
+    /// <summary>
+    /// One step of the watch loop, isolated in its own method rather than inline in
+    /// <see cref="WatchAsync"/>: C# does not allow <c>yield return</c> inside a <c>try</c> block
+    /// that has a <c>catch</c>, so the per-step exception handling that decides reconnect versus
+    /// permanent failure has to live here and hand back an outcome instead.
+    /// </summary>
     private static async Task<(StepOutcome Outcome, FeatureValuesResult? Value)> StepAsync(
         IAsyncEnumerator<ValuesSnapshot> enumerator, FeatureValuesCursor? current, CancellationToken ct)
     {
@@ -138,13 +147,28 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
         return message;
     }
 
+    /// <summary>
+    /// Validates explicitly rather than letting a malformed message throw an unclassified
+    /// exception - mirrors FeatureSnapshotReader's strictness on the HTTP side, so both reference
+    /// transports report the same TinyFlagsClientFailure.InvalidResponse for the same failure class.
+    /// </summary>
     private static FeatureValuesResult ToResult(ValuesSnapshot snapshot)
     {
-        var cursor = new FeatureValuesCursor(Guid.Parse(snapshot.EnvironmentId), snapshot.Revision);
-        var values = snapshot.Values.ToDictionary(value => value.Key,
-            value => value.ValueCase == FeatureValue.ValueOneofCase.BoolValue ? (object)value.BoolValue : value.StringValue,
-            StringComparer.Ordinal);
-        return FeatureValuesResult.Updated(cursor, values);
+        if (!Guid.TryParse(snapshot.EnvironmentId, out var environmentId))
+        {
+            throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+        }
+
+        var values = new Dictionary<string, object>(StringComparer.Ordinal);
+        foreach (var value in snapshot.Values)
+        {
+            var typedValue = value.ValueCase == FeatureValue.ValueOneofCase.BoolValue ? (object)value.BoolValue : value.StringValue;
+            if (!values.TryAdd(value.Key, typedValue))
+            {
+                throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+            }
+        }
+        return FeatureValuesResult.Updated(new FeatureValuesCursor(environmentId, snapshot.Revision), values);
     }
 
     private static TinyFlagsClientFailure ToFailure(StatusCode status) => status switch

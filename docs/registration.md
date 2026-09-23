@@ -93,7 +93,7 @@ Each key identifies one environment and one project, with three independent gran
 
 - `definitions:register`
 - `values:read` — see [Value Synchronization](value-synchronization.md)
-- `values:write` — required by `PATCH /v1/client/values`, see the [Server Protocol](protocol.md)
+- `values:write` — required by `PATCH /v1/client/values`, see [Server Protocol (HTTP)](protocol.md)
 
 `values:write` without `values:read` is rejected at issuance; there is no write-without-read
 combination.

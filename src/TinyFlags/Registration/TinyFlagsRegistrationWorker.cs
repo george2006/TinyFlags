@@ -6,9 +6,16 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
+/// <summary>
+/// Sends the locally-composed flag catalog through <see cref="IFeatureDefinitionsTransport"/>
+/// exactly once per host lifetime, after <see cref="IHostApplicationLifetime.ApplicationStarted"/>
+/// - never on the startup path itself, so a slow or unreachable server never delays the host.
+/// Public, not internal: a transport package in a different assembly needs to call
+/// <c>AddHostedService&lt;TinyFlagsRegistrationWorker&gt;()</c> on it, and every transport shares
+/// this one worker regardless of which transport contracts it implements.
+/// </summary>
 public sealed class TinyFlagsRegistrationWorker : BackgroundService
 {
-    private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly IFeatureDefinitionsTransport transport;
     private readonly IHostApplicationLifetime lifetime;
     private readonly ILogger<TinyFlagsRegistrationWorker> logger;
@@ -24,10 +31,9 @@ public sealed class TinyFlagsRegistrationWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, lifetime.ApplicationStopping);
-        using var signal = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
         try
         {
-            await started.Task.WaitAsync(cancellation.Token).ConfigureAwait(false);
+            await lifetime.WaitForApplicationStartedAsync(cancellation.Token).ConfigureAwait(false);
             cancellation.Token.ThrowIfCancellationRequested();
             await RegisterDefinitionsAsync(cancellation.Token).ConfigureAwait(false);
         }
