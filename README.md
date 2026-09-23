@@ -26,9 +26,9 @@ The code brings the flags. The server only serves their values.
 
 ## Install
 
-TinyFlags is on NuGet.org, currently an early alpha (`0.1.0-alpha.2`, expect breaking changes before
-1.0). The package ID is `TinySuite.TinyFlags` — `TinyFlags` itself was already taken by another
-publisher — but the product, namespaces, and every `using TinyFlags` stay exactly `TinyFlags`:
+TinyFlags is on NuGet.org, currently an early alpha (expect breaking changes before 1.0). The
+package ID is `TinySuite.TinyFlags` — `TinyFlags` itself was already taken by another publisher —
+but the product, namespaces, and every `using TinyFlags` stay exactly `TinyFlags`:
 
 ```bash
 dotnet add package TinySuite.TinyFlags --prerelease
