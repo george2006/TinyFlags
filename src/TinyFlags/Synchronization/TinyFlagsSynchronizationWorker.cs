@@ -6,6 +6,15 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
+/// <summary>
+/// Drains a <b>pull</b> transport (<see cref="IFeatureValuesTransport"/>): fetches once after
+/// startup, then repeats on a recurring, jittered <see cref="FeatureValuesPollingOptions.RefreshInterval"/>
+/// - the only writer to <see cref="FeatureValues"/> when the configured transport is pull-based.
+/// A push-only transport must not register this worker; see
+/// <see cref="TinyFlagsValuesWatchWorker"/> for that side. Public, not internal: a transport
+/// package in a different assembly needs to call
+/// <c>AddHostedService&lt;TinyFlagsSynchronizationWorker&gt;()</c> on it.
+/// </summary>
 public sealed class TinyFlagsSynchronizationWorker : BackgroundService
 {
     private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
