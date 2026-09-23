@@ -1384,3 +1384,39 @@ how `TinyEvents` already has a real `release.yml` publishing multiple packages f
 discussed in any detail yet: whether the three packages version together or independently, what
 triggers a release, or how this relates to `TinyFlags.Server`'s already-existing separate release
 pipeline in its own repo. Explicitly deferred — not part of today's consolidation pass.
+
+## Consolidation pass — done 2026-09-23
+
+Both steps complete across all four `src/` projects, each its own reviewed slice, all on `main`.
+
+**Step 1 (docs).** README reworked (vendor-lock-in-free positioning, "changing your flag provider
+is a week of work, not a migration project"), HTTP and gRPC given equal footing everywhere gRPC had
+been left second-class since it shipped, `docs/grpc-protocol.md` added (gRPC had no
+server-implementer's guide, only the raw `.proto`), stale HTTP-only assumptions fixed in
+`architecture.md`/`registration.md`/`multi-service-flags.md` (a broken anchor, a `409` cited as
+universal when it's HTTP-specific). Every project's XML doc gaps closed — `FeatureValues`,
+`FeatureValuesResult`, `TinyFlagsClientException`/`Failure`, all three workers, `TinyFlagsApiClient`/
+`FeatureSnapshotReader`, and six SourceGen internal types all had none before today.
+
+**Step 2 (smells), real fixes, not just comments:**
+- Extracted the `TaskCompletionSource`/`ApplicationStarted.Register` race duplicated identically
+  across all three workers, into one extension method (`HostApplicationLifetimeExtensions.
+  WaitForApplicationStartedAsync`) — landed on that shape only after rejecting both inheritance
+  (no custom base classes exist anywhere else in this codebase) and a vague "helper" class, per the
+  user's standing rule that reaching for "helper" is itself the smell.
+- Extracted the idempotent-registration dance `UseHttpTransport`/`UseGrpcTransport` each
+  duplicated across two separate packages, into `RegisterSingletonOnce<T>` on `IServiceCollection` —
+  deliberately not a member on `TinyFlagsOptions`, which stays exactly what it always was: a
+  placeholder holding only `Services`.
+- Found and fixed a real consistency bug, not just a style issue: `TinyFlagsGrpcTransport.ToResult`
+  let a malformed `environment_id` or duplicate keys throw unclassified exceptions, where the HTTP
+  side already correctly classified the equivalent failures as `InvalidResponse`. Discovering this
+  also surfaced that `TinyFlagsGrpcTransport` itself had zero automated test coverage (only its
+  options were tested) — closed with a real gRPC test server
+  (`tests/TinyFlags.Grpc.TestServer`), not mocks, and 15 new tests proving registration's status
+  mapping, watch's reconnect/stop split, and the fix itself.
+- Named a duplicated magic number (`TinyFlagsRetryPolicy`'s backoff-attempt cap, `31` in two places).
+
+Full solution: 329 tests (25 core + 27 gRPC + 117 source-gen + 160 HTTP), 0 failures, warnings as
+errors, at every commit along the way. No behavior changes outside the fixes explicitly called out
+above — everything else was additive documentation or a mechanical, verified extraction.
