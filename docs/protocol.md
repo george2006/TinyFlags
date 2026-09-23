@@ -8,10 +8,10 @@ your own ASP.NET Core app, a different language entirely, a thin layer in front 
 feature-flag store. This page is that contract, written for someone implementing an HTTP server
 rather than someone using the SDK.
 
-If you're implementing gRPC instead, the equivalent contract is `tinyflags.proto`
-(`src/TinyFlags.Grpc/Protos/tinyflags.proto`), not this page — the two protocols aren't
-translations of each other, each is its own complete contract. If you're implementing the *client*
-side of either, or a transport that's neither, see [Building a Transport](building-a-transport.md).
+If you're implementing gRPC instead, the equivalent contract is
+[Server Protocol (gRPC)](grpc-protocol.md), not this page — the two protocols aren't translations
+of each other, each is its own complete contract. If you're implementing the *client* side of
+either, or a transport that's neither, see [Building a Transport](building-a-transport.md).
 
 `TinyFlags.Server` is the reference implementation of both, not a requirement — see
 [TinyFlags.Server](https://github.com/george2006/TinyFlags.Server) if you'd rather deploy it than

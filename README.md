@@ -141,6 +141,7 @@ and authentication.
 - [Registration](docs/registration.md)
 - [Value Synchronization](docs/value-synchronization.md)
 - [Server Protocol (HTTP)](docs/protocol.md)
+- [Server Protocol (gRPC)](docs/grpc-protocol.md)
 - [Building a Transport](docs/building-a-transport.md)
 - [Sharing a Flag Across Services](docs/multi-service-flags.md)
 - [Single-Service HTTP Sample](samples/SingleServiceHttp/README.md) — one service, one flag, polling over HTTP
