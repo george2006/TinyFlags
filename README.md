@@ -26,21 +26,21 @@ The code brings the flags. The server only serves their values.
 
 ## Install
 
-TinyFlags is not yet published to NuGet.org (current version: `0.1.0-dev`). Pack and reference it
-locally:
+TinyFlags is on NuGet.org, currently an early alpha (`0.1.0-alpha.2`, expect breaking changes before
+1.0). The package ID is `TinySuite.TinyFlags` — `TinyFlags` itself was already taken by another
+publisher — but the product, namespaces, and every `using TinyFlags` stay exactly `TinyFlags`:
 
 ```bash
-dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
-dotnet add package TinySuite.TinyFlags --source artifacts/packages
+dotnet add package TinySuite.TinyFlags --prerelease
 
 # Pick a transport - only needed if you're connecting to a server (talking to TinyFlags.Server or your own):
-dotnet pack src/TinyFlags.Http/TinyFlags.Http.csproj -c Release -o artifacts/packages
-dotnet add package TinySuite.TinyFlags.Http --source artifacts/packages
+dotnet add package TinySuite.TinyFlags.Http --prerelease
 
 # ...or, for real-time push instead of polling:
-dotnet pack src/TinyFlags.Grpc/TinyFlags.Grpc.csproj -c Release -o artifacts/packages
-dotnet add package TinySuite.TinyFlags.Grpc --source artifacts/packages
+dotnet add package TinySuite.TinyFlags.Grpc --prerelease
 ```
+
+`--prerelease` is required for now since there's no stable release yet; drop it once one ships.
 
 ## Quick start
 

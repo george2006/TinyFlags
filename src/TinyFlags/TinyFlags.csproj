@@ -14,7 +14,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags 0.1.0-alpha.2
+      TinyFlags 0.1.0-alpha.3
 
       Added
       - Typed feature-flag declarations via IFeatureProvider, with compile-time-generated access classes.
@@ -23,6 +23,10 @@
         any package can implement - see TinyFlags.Http and TinyFlags.Grpc for two real examples.
       - Multi-assembly catalog composition via TinyFlagsBootstrap.
       - Source-generator diagnostics (TFG001-TFG005) for unsupported declarations.
+
+      Fixed
+      - README/docs still said "not yet published to NuGet.org" and gave local-pack install
+        instructions after alpha.2 had actually shipped; now point at the real package id.
 
       Compatibility
       - Early alpha: API surface, especially the transport contracts, may still change before 1.0.

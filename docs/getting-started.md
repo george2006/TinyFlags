@@ -5,11 +5,11 @@ connected to a server.
 
 ## 1) Install
 
-Not yet published to NuGet.org. Pack and reference it locally:
+On NuGet.org as `TinySuite.TinyFlags` (early alpha - see the top-level [README](../README.md#install)
+for why the package ID differs from the product name):
 
 ```bash
-dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o artifacts/packages
-dotnet add package TinySuite.TinyFlags --source artifacts/packages
+dotnet add package TinySuite.TinyFlags --prerelease
 ```
 
 ## 2) Declare a flag provider

@@ -13,12 +13,15 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags.Grpc 0.1.0-alpha.2
+      TinyFlags.Grpc 0.1.0-alpha.3
 
       Added
       - Reference gRPC transport: registration plus real-time push value synchronization over a Watch stream.
       - Automatic reconnect on transient failures; permanent failures surface as TinyFlagsClientException.
       - Strict response validation, consistent with the HTTP transport's failure classification (docs/grpc-protocol.md).
+
+      Fixed
+      - README/docs still said "not yet published to NuGet.org" after alpha.2 had actually shipped.
 
       Compatibility
       - Early alpha, matches TinyFlags's contract version.
