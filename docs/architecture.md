@@ -120,7 +120,7 @@ conceptual shape, not something you need access to it to understand):
 - The server never originates a flag. It stores and serves values for definitions a client already
   registered; see [Registration](registration.md) for the exact contract.
 - A transport only ever knows a base address, a Bearer token, and the contracts above — no
-  transport, including the ones we ship, has special access the interfaces don't expose. See the
-  [Server Protocol](protocol.md) for the HTTP wire contract, or `tinyflags.proto` for gRPC's, if
-  you're implementing your own against `TinyFlags.Server`; see
-  [Building a Transport](building-a-transport.md) if you're implementing the client side instead.
+  transport, including the ones we ship, has special access the interfaces don't expose. See
+  [Server Protocol (HTTP)](protocol.md) or [Server Protocol (gRPC)](grpc-protocol.md) if you're
+  implementing your own server; see [Building a Transport](building-a-transport.md) if you're
+  implementing the client side instead.
