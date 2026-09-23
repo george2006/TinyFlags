@@ -14,6 +14,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags;
 
+/// <summary>
+/// The reference HTTP transport: implements both registration and pull value sync against
+/// docs/protocol.md's wire contract. Owns retries (<see cref="TinyFlagsRetryPolicy"/>) and strict
+/// response validation (<see cref="FeatureSnapshotReader"/>) so neither worker ever sees a raw
+/// <see cref="HttpResponseMessage"/> or has to know this transport speaks HTTP at all.
+/// </summary>
 internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatureValuesTransport, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
