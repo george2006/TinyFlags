@@ -27,7 +27,9 @@ not appear in `TheTinyApplicationLayer`'s shared sample yet — that integration
 feature set settles, not implemented today. Adopting TinyFlags does not require adopting anything
 else from the suite.
 
-One internal detail worth knowing: `TinyFlags.Server` is itself built with TinyDispatcher for its
-own command/query handling (`Features/RegisterDefinitions`, `Features/GetFeatureValues`). That is
-an implementation choice inside the server, not a dependency your application takes on by using
-the TinyFlags client.
+One internal detail worth knowing: `TinyFlags.Server` is itself built with three of its own
+siblings — TinyDispatcher for command/query handling (`Features/RegisterDefinitions`,
+`Features/GetFeatureValues`), TinyValidations for input validation, and TinyEvents for the
+durable, retried outbox behind its gRPC push notifications. That is an implementation choice
+inside the server, not a dependency your application takes on by using the TinyFlags client - see
+[The Reference Server](reference-server.md) for more about that server itself.

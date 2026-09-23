@@ -176,10 +176,9 @@ TinyFlags belongs to the Tiny suite:
 
 Same author, same philosophy: compile-time correctness over runtime string keys. TinyFlags has no
 SDK-level dependency on the other libraries. Its reference server, `TinyFlags.Server`, is a
-separate, privately-hosted repo — this one only knows the wire contracts it speaks (HTTP or gRPC,
-see [Building a Transport](docs/building-a-transport.md)), not its implementation.
-`TheTinyApplicationLayer` does not include a flags example yet — that is planned once this feature
-set settles. See [Tiny suite](docs/tiny-suite.md).
+separate, privately-hosted repo — see [The Reference Server](docs/reference-server.md) for what
+that means in practice. `TheTinyApplicationLayer` does not include a flags example yet — that is
+planned once this feature set settles. See [Tiny suite](docs/tiny-suite.md).
 
 ## When to use
 
