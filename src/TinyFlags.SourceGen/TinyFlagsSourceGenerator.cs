@@ -12,6 +12,13 @@ using TinyFlags.SourceGen.Validation;
 
 namespace TinyFlags.SourceGen;
 
+/// <summary>
+/// Entry point wiring the four pipeline phases together: Discovery (cheap syntax filter) ->
+/// Analysis (resolves symbols, produces plain models, no Roslyn beyond this point) -> Validation
+/// (checks the five TFG0xx rules) -> Generation (Planning + Emission, turns validated definitions
+/// into source text). Also composes the per-assembly feature catalog and reports both per-provider
+/// and catalog-level diagnostics.
+/// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class TinyFlagsSourceGenerator : IIncrementalGenerator
 {

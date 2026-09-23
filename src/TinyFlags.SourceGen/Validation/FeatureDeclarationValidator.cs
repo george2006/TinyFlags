@@ -4,6 +4,12 @@ using TinyFlags.SourceGen.Model;
 
 namespace TinyFlags.SourceGen.Validation;
 
+/// <summary>
+/// Checks one analyzed provider and its properties against the five TFG0xx rules. A provider with
+/// any issue contributes no <see cref="FeatureProviderDefinition"/> at all - partial success isn't
+/// an option, since a definition built from an invalid provider would have nothing meaningful to
+/// generate access code from.
+/// </summary>
 internal sealed class FeatureDeclarationValidator
 {
     public FeatureValidationResult Validate(

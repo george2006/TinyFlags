@@ -9,6 +9,8 @@ internal sealed class FeatureAccessPlanner
 {
     public FeatureAccessPlan Create(FeatureProviderDefinition provider)
     {
+        // A flag could itself be named "_values" (or "__values", ...) - keep appending until the
+        // backing field name can't collide with any property this class is about to generate.
         var names = new HashSet<string>(provider.Features.Select(feature => feature.Name), StringComparer.Ordinal);
         var fieldName = "_values";
 

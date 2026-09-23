@@ -79,6 +79,8 @@ internal sealed class FeatureAccessEmitter
             source.Append("new ");
         }
 
+        // "@" makes this a verbatim identifier, so a flag named after a C# keyword (e.g. "class")
+        // still emits valid source - FeatureAccessPlan.HintName strips it back out for the same reason.
         source.Append(isBoolean ? "bool" : "string").Append(" @").Append(feature.Name)
             .Append(" => this.").Append(plan.FieldName)
             .Append(isBoolean ? ".GetBoolean(" : ".GetString(");
