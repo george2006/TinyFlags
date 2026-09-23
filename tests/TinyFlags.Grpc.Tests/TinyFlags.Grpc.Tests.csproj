@@ -14,6 +14,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="../../src/TinyFlags.Grpc/TinyFlags.Grpc.csproj" />
+    <ProjectReference Include="../TinyFlags.Grpc.TestServer/TinyFlags.Grpc.TestServer.csproj" />
     <ProjectReference Include="../../src/TinyFlags.SourceGen/TinyFlags.SourceGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

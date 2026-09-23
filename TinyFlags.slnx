@@ -15,6 +15,7 @@
     <Project Path="tests/TinyFlags.Tests/TinyFlags.Tests.csproj" />
     <Project Path="tests/TinyFlags.Http.Tests/TinyFlags.Http.Tests.csproj" />
     <Project Path="tests/TinyFlags.Grpc.Tests/TinyFlags.Grpc.Tests.csproj" />
+    <Project Path="tests/TinyFlags.Grpc.TestServer/TinyFlags.Grpc.TestServer.csproj" />
     <Project Path="tests/TinyFlags.SourceGen.Tests/TinyFlags.SourceGen.Tests.csproj" />
   </Folder>
 </Solution>

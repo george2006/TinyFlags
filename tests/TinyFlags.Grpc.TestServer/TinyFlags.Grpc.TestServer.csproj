@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.84.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Core only, not TinyFlags.Grpc: this project generates its own server-side stubs from the
+         same tinyflags.proto below, so referencing TinyFlags.Grpc's client-generated copy of the
+         same message types would shadow them (CS0436) - see TinyFlagsGrpcTransportTests.cs for why
+         this project exists at all instead of generating server stubs directly in the test project. -->
+    <ProjectReference Include="../../src/TinyFlags/TinyFlags.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../src/TinyFlags.Grpc/Protos/tinyflags.proto" GrpcServices="Server" Link="Protos/tinyflags.proto" />
+  </ItemGroup>
+</Project>
