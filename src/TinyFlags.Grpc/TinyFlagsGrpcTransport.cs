@@ -68,7 +68,7 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
             {
                 while (true)
                 {
-                    var (outcome, value) = await StepAsync(enumerator, current, ct).ConfigureAwait(false);
+                    var (outcome, value) = await StepAsync(enumerator, catalog, current, ct).ConfigureAwait(false);
                     if (outcome == StepOutcome.Completed)
                     {
                         yield break;
@@ -76,6 +76,10 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
                     if (outcome == StepOutcome.Reconnect)
                     {
                         break;
+                    }
+                    if (outcome == StepOutcome.Stale)
+                    {
+                        continue;
                     }
                     current = value!.Cursor;
                     yield return value;
@@ -92,7 +96,8 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
     /// permanent failure has to live here and hand back an outcome instead.
     /// </summary>
     private static async Task<(StepOutcome Outcome, FeatureValuesResult? Value)> StepAsync(
-        IAsyncEnumerator<ValuesSnapshot> enumerator, FeatureValuesCursor? current, CancellationToken ct)
+        IAsyncEnumerator<ValuesSnapshot> enumerator, IReadOnlyList<FeatureDefinition> catalog,
+        FeatureValuesCursor? current, CancellationToken ct)
     {
         try
         {
@@ -101,13 +106,22 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
                 return (StepOutcome.Completed, null);
             }
 
-            var result = ToResult(enumerator.Current);
+            var result = ToResult(enumerator.Current, catalog);
             // Cross-checked on every message, not just the first - catches a misbehaving server
             // or a credential that started pointing at a different environment mid-stream, not
             // just a mismatch at connect time.
             if (current is not null && result.Cursor!.EnvironmentId != current.EnvironmentId)
             {
                 throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+            }
+            // A reconnect (or a lagging replica) can hand back a snapshot the caller already has
+            // or has already moved past - never roll values backward. This is not the same as the
+            // HTTP transport's Unchanged(): a push transport must never yield Unchanged (see
+            // building-a-transport.md), so a stale message is silently skipped instead, same as a
+            // transient reconnect, rather than surfaced as a value or an error.
+            if (current is not null && result.Cursor!.Revision <= current.Revision)
+            {
+                return (StepOutcome.Stale, null);
             }
             return (StepOutcome.Value, result);
         }
@@ -121,7 +135,7 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
         }
     }
 
-    private enum StepOutcome { Value, Completed, Reconnect }
+    private enum StepOutcome { Value, Completed, Reconnect, Stale }
 
     private static bool IsTransient(StatusCode status)
         => status is StatusCode.Unavailable or StatusCode.DeadlineExceeded or StatusCode.Internal or StatusCode.Aborted;
@@ -149,20 +163,37 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
 
     /// <summary>
     /// Validates explicitly rather than letting a malformed message throw an unclassified
-    /// exception - mirrors FeatureSnapshotReader's strictness on the HTTP side, so both reference
-    /// transports report the same TinyFlagsClientFailure.InvalidResponse for the same failure class.
+    /// exception, or silently accepting one - mirrors FeatureSnapshotReader's strictness on the
+    /// HTTP side, so both reference transports report the same TinyFlagsClientFailure.InvalidResponse
+    /// for the same failure class. Unlike HTTP, a valid but unrecognized key is still accepted
+    /// (docs/protocol.md's "valid unknown keys are allowed" rule applies here too); only a known
+    /// key whose kind disagrees with the local declaration is rejected.
     /// </summary>
-    private static FeatureValuesResult ToResult(ValuesSnapshot snapshot)
+    private static FeatureValuesResult ToResult(ValuesSnapshot snapshot, IReadOnlyList<FeatureDefinition> catalog)
     {
-        if (!Guid.TryParse(snapshot.EnvironmentId, out var environmentId))
+        if (!Guid.TryParse(snapshot.EnvironmentId, out var environmentId) || environmentId == Guid.Empty)
+        {
+            throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+        }
+        if (snapshot.Revision < 0)
         {
             throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
         }
 
+        var knownKinds = catalog.ToDictionary(definition => definition.Key, definition => definition.Kind, StringComparer.Ordinal);
         var values = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var value in snapshot.Values)
         {
-            var typedValue = value.ValueCase == FeatureValue.ValueOneofCase.BoolValue ? (object)value.BoolValue : value.StringValue;
+            if (string.IsNullOrWhiteSpace(value.Key))
+            {
+                throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+            }
+
+            var (kind, typedValue) = ToKindAndValue(value);
+            if (knownKinds.TryGetValue(value.Key, out var knownKind) && knownKind != kind)
+            {
+                throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
+            }
             if (!values.TryAdd(value.Key, typedValue))
             {
                 throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse);
@@ -170,6 +201,19 @@ internal sealed class TinyFlagsGrpcTransport : IFeatureDefinitionsTransport, IFe
         }
         return FeatureValuesResult.Updated(new FeatureValuesCursor(environmentId, snapshot.Revision), values);
     }
+
+    /// <summary>
+    /// Reads Kind and the oneof together, rejecting either alone: an unset oneof (ValueCase.None)
+    /// would otherwise silently read as an empty string rather than an error, and Kind disagreeing
+    /// with which case is actually set (e.g. Boolean claimed while a string is carried) would
+    /// otherwise go unnoticed since nothing else in the message shape links the two.
+    /// </summary>
+    private static (FeatureKind Kind, object Value) ToKindAndValue(FeatureValue value) => (value.Kind, value.ValueCase) switch
+    {
+        (ProtoFeatureKind.Boolean, FeatureValue.ValueOneofCase.BoolValue) => (FeatureKind.Boolean, value.BoolValue),
+        (ProtoFeatureKind.String, FeatureValue.ValueOneofCase.StringValue) => (FeatureKind.String, value.StringValue),
+        _ => throw new TinyFlagsClientException(TinyFlagsClientFailure.InvalidResponse)
+    };
 
     private static TinyFlagsClientFailure ToFailure(StatusCode status) => status switch
     {

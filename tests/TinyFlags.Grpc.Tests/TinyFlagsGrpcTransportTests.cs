@@ -61,11 +61,11 @@ public sealed class TinyFlagsGrpcTransportTests
         var secondReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var server = await FakeTinyFlagsServer.StartAsync();
 
-        async IAsyncEnumerable<(string, long, IReadOnlyList<(string, object)>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
         {
-            yield return (environmentId, 1, [("A", true)]);
+            yield return (environmentId, 1, [RawFeatureValue.Bool("A", true)]);
             await secondReady.Task.WaitAsync(ct);
-            yield return (environmentId, 2, [("A", false)]);
+            yield return (environmentId, 2, [RawFeatureValue.Bool("A", false)]);
         }
         server.OnWatch = Stream;
 
@@ -85,13 +85,34 @@ public sealed class TinyFlagsGrpcTransportTests
     }
 
     [Fact]
+    public async Task Watch_yields_a_valid_string_value()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            yield return (environmentId, 1, [RawFeatureValue.String("A.B", "Comprar")]);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = transport.WatchAsync([]).GetAsyncEnumerator(timeout.Token);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal("Comprar", enumerator.Current.Values!["A.B"]);
+    }
+
+    [Fact]
     public async Task Watch_reconnects_after_a_transient_status_and_resends_a_full_snapshot()
     {
         var environmentId = Guid.NewGuid().ToString("D");
         var attempts = 0;
         await using var server = await FakeTinyFlagsServer.StartAsync();
 
-        async IAsyncEnumerable<(string, long, IReadOnlyList<(string, object)>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
         {
             if (Interlocked.Increment(ref attempts) == 1)
             {
@@ -113,6 +134,41 @@ public sealed class TinyFlagsGrpcTransportTests
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal(2, enumerator.Current.Cursor!.Revision);
         Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task Watch_skips_a_stale_or_equal_revision_after_reconnect()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        var attempts = 0;
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                yield return (environmentId, 5, [RawFeatureValue.Bool("A", true)]);
+                throw new FakeGrpcStatusException(StatusCode.Unavailable);
+            }
+            // Reconnected to a replica that's behind: resends the same revision already accepted,
+            // then finally catches up. The resend must never be surfaced or roll values backward.
+            yield return (environmentId, 5, [RawFeatureValue.Bool("A", false)]);
+            yield return (environmentId, 6, [RawFeatureValue.Bool("A", false)]);
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server, reconnectDelay: TimeSpan.FromMilliseconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = transport.WatchAsync([]).GetAsyncEnumerator(timeout.Token);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(5, enumerator.Current.Cursor!.Revision);
+        Assert.Equal(true, enumerator.Current.Values!["A"]);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(6, enumerator.Current.Cursor!.Revision);
+        Assert.Equal(false, enumerator.Current.Values!["A"]);
     }
 
     [Fact]
@@ -144,7 +200,7 @@ public sealed class TinyFlagsGrpcTransportTests
         var second = Guid.NewGuid().ToString("D");
         await using var server = await FakeTinyFlagsServer.StartAsync();
 
-        async IAsyncEnumerable<(string, long, IReadOnlyList<(string, object)>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
         {
             yield return (first, 1, []);
             yield return (second, 2, []);
@@ -166,11 +222,12 @@ public sealed class TinyFlagsGrpcTransportTests
     [Theory]
     [InlineData("not-a-guid")]
     [InlineData("")]
-    public async Task Watch_rejects_a_malformed_environment_id(string environmentId)
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public async Task Watch_rejects_a_malformed_or_empty_environment_id(string environmentId)
     {
         await using var server = await FakeTinyFlagsServer.StartAsync();
 
-        async IAsyncEnumerable<(string, long, IReadOnlyList<(string, object)>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
         {
             yield return (environmentId, 1, []);
             await Task.CompletedTask;
@@ -186,14 +243,124 @@ public sealed class TinyFlagsGrpcTransportTests
     }
 
     [Fact]
+    public async Task Watch_rejects_a_negative_revision()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            yield return (environmentId, -1, []);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = transport.WatchAsync([]).GetAsyncEnumerator(timeout.Token);
+
+        var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => enumerator.MoveNextAsync().AsTask());
+        Assert.Equal(TinyFlagsClientFailure.InvalidResponse, error.Failure);
+    }
+
+    [Fact]
+    public async Task Watch_rejects_an_unset_value()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            // Kind claims Boolean, but neither the bool nor the string slot is set.
+            yield return (environmentId, 1, [new RawFeatureValue("A", RawFeatureKind.Boolean, null, null)]);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = transport.WatchAsync([]).GetAsyncEnumerator(timeout.Token);
+
+        var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => enumerator.MoveNextAsync().AsTask());
+        Assert.Equal(TinyFlagsClientFailure.InvalidResponse, error.Failure);
+    }
+
+    [Fact]
+    public async Task Watch_rejects_a_kind_value_mismatch()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            // Kind claims Boolean, but only the string slot is actually set.
+            yield return (environmentId, 1, [new RawFeatureValue("A", RawFeatureKind.Boolean, null, "oops")]);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = transport.WatchAsync([]).GetAsyncEnumerator(timeout.Token);
+
+        var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => enumerator.MoveNextAsync().AsTask());
+        Assert.Equal(TinyFlagsClientFailure.InvalidResponse, error.Failure);
+    }
+
+    [Fact]
+    public async Task Watch_rejects_a_known_key_whose_kind_disagrees_with_the_local_catalog()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            // Server sends "A.B" as a String; the local catalog declares it Boolean.
+            yield return (environmentId, 1, [RawFeatureValue.String("A.B", "true")]);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        FeatureDefinition[] catalog = [FeatureDefinition.Boolean("A.B", false)];
+        await using var enumerator = transport.WatchAsync(catalog).GetAsyncEnumerator(timeout.Token);
+
+        var error = await Assert.ThrowsAsync<TinyFlagsClientException>(() => enumerator.MoveNextAsync().AsTask());
+        Assert.Equal(TinyFlagsClientFailure.InvalidResponse, error.Failure);
+    }
+
+    [Fact]
+    public async Task Watch_allows_a_key_not_present_in_the_local_catalog()
+    {
+        var environmentId = Guid.NewGuid().ToString("D");
+        await using var server = await FakeTinyFlagsServer.StartAsync();
+
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        {
+            yield return (environmentId, 1, [RawFeatureValue.Bool("Unknown.Key", true)]);
+            await Task.CompletedTask;
+        }
+        server.OnWatch = Stream;
+
+        using var transport = CreateTransport(server);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        FeatureDefinition[] catalog = [FeatureDefinition.Boolean("A.B", false)];
+        await using var enumerator = transport.WatchAsync(catalog).GetAsyncEnumerator(timeout.Token);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(true, enumerator.Current.Values!["Unknown.Key"]);
+    }
+
+    [Fact]
     public async Task Watch_rejects_duplicate_keys_in_one_snapshot()
     {
         var environmentId = Guid.NewGuid().ToString("D");
         await using var server = await FakeTinyFlagsServer.StartAsync();
 
-        async IAsyncEnumerable<(string, long, IReadOnlyList<(string, object)>)> Stream([EnumeratorCancellation] CancellationToken ct)
+        async IAsyncEnumerable<(string, long, IReadOnlyList<RawFeatureValue>)> Stream([EnumeratorCancellation] CancellationToken ct)
         {
-            yield return (environmentId, 1, [("A", true), ("A", false)]);
+            yield return (environmentId, 1, [RawFeatureValue.Bool("A", true), RawFeatureValue.Bool("A", false)]);
             await Task.CompletedTask;
         }
         server.OnWatch = Stream;

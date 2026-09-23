@@ -28,16 +28,27 @@ internal sealed class ValuesService(FakeTinyFlagsServer server) : TinyFlagsValue
         }
     }
 
-    private static ProtoFeatureValue ToProtoValue((string Key, object Value) entry)
+    private static ProtoFeatureValue ToProtoValue(RawFeatureValue entry)
     {
-        var value = new ProtoFeatureValue { Key = entry.Key, Kind = entry.Value is bool ? ProtoFeatureKind.Boolean : ProtoFeatureKind.String };
-        if (entry.Value is bool boolValue)
+        var value = new ProtoFeatureValue
+        {
+            Key = entry.Key,
+            Kind = entry.Kind switch
+            {
+                RawFeatureKind.Boolean => ProtoFeatureKind.Boolean,
+                RawFeatureKind.String => ProtoFeatureKind.String,
+                _ => ProtoFeatureKind.Unspecified
+            }
+        };
+        // Independent of Kind above, on purpose: lets a test set Kind without the matching value
+        // (or neither value), to exercise TinyFlagsGrpcTransport's own cross-check.
+        if (entry.BoolValue is { } boolValue)
         {
             value.BoolValue = boolValue;
         }
-        else
+        else if (entry.StringValue is { } stringValue)
         {
-            value.StringValue = (string)entry.Value;
+            value.StringValue = stringValue;
         }
         return value;
     }

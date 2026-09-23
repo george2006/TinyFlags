@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace TinyFlags;
 
@@ -34,9 +35,12 @@ public sealed class TinyFlagsGrpcOptions
             throw new ArgumentException("Endpoint must be an absolute HTTPS base URI, or HTTP on loopback, without credentials, query or fragment.", nameof(Endpoint));
         }
 
-        if (string.IsNullOrEmpty(ApiKey))
+        // Same rule as TinyFlagsHttpOptions: the Bearer token travels as call metadata, exactly as
+        // leakable to logs or a misbehaving intermediary if it carries whitespace or control
+        // characters as HTTP header text would be.
+        if (string.IsNullOrEmpty(ApiKey) || ApiKey.Any(character => character <= ' ' || character >= '\u007f'))
         {
-            throw new ArgumentException("ApiKey is required.", nameof(ApiKey));
+            throw new ArgumentException("ApiKey must contain visible ASCII characters without whitespace.", nameof(ApiKey));
         }
 
         if (ReconnectDelay <= TimeSpan.Zero)

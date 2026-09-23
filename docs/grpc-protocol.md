@@ -110,9 +110,16 @@ Requirements the client enforces exactly:
   already uses, so a server implementing both can share the formatting logic.
 - `revision`: required, a non-negative integer. The client doesn't send a "known revision" back
   (there's no equivalent of `If-None-Match` here — the stream itself carries that role), but it
-  does check `revision` alongside `environment_id` as its cursor into `FeatureValuesCursor`.
+  does check `revision` alongside `environment_id` as its cursor into `FeatureValuesCursor`. A
+  message whose revision is less than or equal to the client's own cursor for that environment is
+  silently skipped rather than applied — this matters most right after a reconnect, where a
+  lagging replica could otherwise resend a snapshot older than one the client already has and roll
+  it backward.
 - `values`: each entry needs a non-blank `key`, a `kind` of `FEATURE_KIND_BOOLEAN` or
-  `FEATURE_KIND_STRING`, and exactly one of `bool_value`/`string_value` set, matching `kind`.
+  `FEATURE_KIND_STRING`, and exactly one of `bool_value`/`string_value` set, matching `kind`. A key
+  the client doesn't recognize from its own declared catalog is still accepted — same "valid
+  unknown keys are allowed" rule as the HTTP contract — but a *known* key whose kind disagrees with
+  the client's own declaration is rejected.
 - **The stream never completes on its own.** Hold it open for as long as the client wants updates.
   If your server needs to end a call (shutdown, environment deleted, credential revoked
   mid-stream), end it with a real gRPC status — an unexpected clean completion is treated the same

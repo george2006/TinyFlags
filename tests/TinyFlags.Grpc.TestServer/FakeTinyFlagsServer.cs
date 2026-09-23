@@ -30,11 +30,12 @@ public sealed class FakeTinyFlagsServer : IAsyncDisposable
     /// Called once per Watch call (so once per connection attempt, including reconnects). Yield a
     /// snapshot to send it; let the enumerable complete to end the stream cleanly; throw
     /// <see cref="FakeGrpcStatusException"/> to end it with a specific status instead.
-    /// EnvironmentId is a raw string and Values a plain list, not a Guid/Dictionary - deliberately
-    /// permissive, so a test can put a malformed environment id or duplicate keys on the wire the
-    /// same way a real buggy server could, rather than being structurally prevented from it.
+    /// EnvironmentId is a raw string and Values a plain list of <see cref="RawFeatureValue"/>, not
+    /// a Guid/Dictionary - deliberately permissive, so a test can put a malformed environment id,
+    /// duplicate keys, or a kind/value mismatch on the wire the same way a real buggy server
+    /// could, rather than being structurally prevented from it.
     /// </summary>
-    public Func<CancellationToken, IAsyncEnumerable<(string EnvironmentId, long Revision, IReadOnlyList<(string Key, object Value)> Values)>>? OnWatch { get; set; }
+    public Func<CancellationToken, IAsyncEnumerable<(string EnvironmentId, long Revision, IReadOnlyList<RawFeatureValue> Values)>>? OnWatch { get; set; }
 
     private FakeTinyFlagsServer()
     {
