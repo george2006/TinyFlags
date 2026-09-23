@@ -1360,3 +1360,22 @@ Not started as of this note. No behavior changes are in scope for either step �
 readability/publishability pass, not a feature or a refactor. If a step 2 review surfaces an actual
 bug (not just a smell), stop and raise it separately rather than folding a behavior fix into a
 cleanup commit.
+
+Slice 1 (README) done 2026-09-23: softened the opening's tone after review, generalized the
+`ETag`/conditional-GET bullet since it's HTTP-only detail in a transport-agnostic feature list, and
+gave `TinyFlags.Grpc` the same README treatment `TinyFlags.Http` already had (install instructions,
+Quick start sample, Components line) — all missing since gRPC shipped. Also identified, not yet
+built: `docs/protocol.md` documents the HTTP wire contract for someone implementing their own
+server, but there's no gRPC equivalent — only the raw `.proto` file. Next up if the user wants it:
+`docs/grpc-protocol.md`, mirroring `protocol.md`'s structure, linked from `docs/README.md`,
+`building-a-transport.md`'s "See also", and `getting-started.md`.
+
+## Future to-do (raised 2026-09-23, not scheduled): release train for TinyFlags and its transports
+
+The user wants a real release process (a "release train") for this repo and its transport
+packages (`TinyFlags`, `TinyFlags.Http`, `TinyFlags.Grpc`) once it's public — presumably versioning
+and publishing all three to NuGet.org together or on a coordinated cadence, similar in spirit to
+how `TinyEvents` already has a real `release.yml` publishing multiple packages from one tag. Not
+discussed in any detail yet: whether the three packages version together or independently, what
+triggers a release, or how this relates to `TinyFlags.Server`'s already-existing separate release
+pipeline in its own repo. Explicitly deferred — not part of today's consolidation pass.
