@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: nuget-prod
+    permissions:
+      contents: write
+      id-token: write # enables GitHub OIDC token issuance, needed for NuGet Trusted Publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build and test before publishing anything
+        run: |
+          dotnet build TinyFlags.slnx -warnaserror
+          dotnet test TinyFlags.slnx -warnaserror
+
+      - name: Verify the packaged generator (real pack -> restore -> build -> run)
+        shell: pwsh
+        run: ./tests/TinyFlags.PackageTests/Verify-Package.ps1
+
+      - name: Derive the package version from the tag
+        id: version
+        shell: bash
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Pack all three packages at the tag's version
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          dotnet pack src/TinyFlags/TinyFlags.csproj -c Release -o ./artifacts -p:Version="$VERSION"
+          dotnet pack src/TinyFlags.Http/TinyFlags.Http.csproj -c Release -o ./artifacts -p:Version="$VERSION"
+          dotnet pack src/TinyFlags.Grpc/TinyFlags.Grpc.csproj -c Release -o ./artifacts -p:Version="$VERSION"
+
+      - name: Verify package version matches the tag
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          echo "Git tag version: $VERSION"
+          echo "Artifacts:"
+          ls -la ./artifacts
+          for PACKAGE_ID in TinyFlags TinyFlags.Http TinyFlags.Grpc; do
+            if [ ! -f "./artifacts/${PACKAGE_ID}.${VERSION}.nupkg" ]; then
+              echo "ERROR: Expected ./artifacts/${PACKAGE_ID}.${VERSION}.nupkg but it was not found."
+              exit 1
+            fi
+          done
+
+      # Trusted Publishing (OIDC): exchanges this run's GitHub-issued token for a NuGet API key
+      # that's valid for one hour and scoped to this exact repo/workflow/environment - no
+      # long-lived NUGET_API_KEY secret to store or rotate. Requested here, right before the push,
+      # since the key expires quickly.
+      - name: NuGet login (OIDC -> temporary API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: durbich
+
+      - name: Publish to NuGet
+        run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+
+      - name: Upload nupkgs to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/*.nupkg
