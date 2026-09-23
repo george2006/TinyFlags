@@ -1364,11 +1364,16 @@ cleanup commit.
 Slice 1 (README) done 2026-09-23: softened the opening's tone after review, generalized the
 `ETag`/conditional-GET bullet since it's HTTP-only detail in a transport-agnostic feature list, and
 gave `TinyFlags.Grpc` the same README treatment `TinyFlags.Http` already had (install instructions,
-Quick start sample, Components line) — all missing since gRPC shipped. Also identified, not yet
-built: `docs/protocol.md` documents the HTTP wire contract for someone implementing their own
-server, but there's no gRPC equivalent — only the raw `.proto` file. Next up if the user wants it:
-`docs/grpc-protocol.md`, mirroring `protocol.md`'s structure, linked from `docs/README.md`,
-`building-a-transport.md`'s "See also", and `getting-started.md`.
+Quick start sample, Components line) — all missing since gRPC shipped.
+
+Slice 2 (`docs/grpc-protocol.md`) done 2026-09-23: closed the gap found while reviewing slice 1 —
+`docs/protocol.md` documented the HTTP wire contract for someone implementing their own server, but
+gRPC only had the raw `.proto` file. Added `docs/grpc-protocol.md`, mirroring `protocol.md`'s exact
+structure (services/methods, wire shapes, error-status mapping, what's fixed vs. yours to design),
+sourced from the real contract (`tinyflags.proto`) and the real client mapping
+(`TinyFlagsGrpcTransport.ToFailure`/`IsTransient`), not guessed. Linked from every place
+`protocol.md` was previously linked alone: `docs/README.md`, `README.md`,
+`building-a-transport.md`'s "See also", `getting-started.md`.
 
 ## Future to-do (raised 2026-09-23, not scheduled): release train for TinyFlags and its transports
 
