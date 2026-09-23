@@ -18,7 +18,6 @@ namespace TinyFlags;
 /// </summary>
 public sealed class TinyFlagsValuesWatchWorker : BackgroundService
 {
-    private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly IFeatureValuesSubscription subscription;
     private readonly FeatureValues values;
     private readonly IHostApplicationLifetime lifetime;
@@ -36,10 +35,9 @@ public sealed class TinyFlagsValuesWatchWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, lifetime.ApplicationStopping);
-        using var signal = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
         try
         {
-            await started.Task.WaitAsync(cancellation.Token).ConfigureAwait(false);
+            await lifetime.WaitForApplicationStartedAsync(cancellation.Token).ConfigureAwait(false);
             await WatchAsync(cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
