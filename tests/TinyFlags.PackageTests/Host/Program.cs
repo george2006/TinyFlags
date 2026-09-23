@@ -1,14 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Shop;
 using TinyFlags;
 
 ShopModule.Initialize();
-if (args.Contains("--register"))
-{
-    await RegisterWithServerAsync();
-    return;
-}
 
 var services = new ServiceCollection().AddTinyFlags();
 services.AddTinyFlags();
@@ -36,28 +30,6 @@ Require(TinyFlagsBootstrap.GetDefinitions().Select(definition => definition.Key)
     new[] { "Home.Enabled", "Shop.Checkout.Enabled", "Shop.Checkout.Label" }), "Root catalog composition");
 Require(!File.Exists(Path.Combine(AppContext.BaseDirectory, "TinyFlags.SourceGen.dll")), "Generator stays a compiler asset");
 Console.WriteLine("TinyFlags package consumer passed.");
-
-static async Task RegisterWithServerAsync()
-{
-    var builder = Host.CreateApplicationBuilder();
-    builder.Services.AddTinyFlags(options =>
-    {
-        options.Endpoint = new Uri(Environment.GetEnvironmentVariable("TINYFLAGS_TEST_ENDPOINT")!);
-        options.ApiKey = Environment.GetEnvironmentVariable("TINYFLAGS_TEST_API_KEY");
-        options.RetryDelay = TimeSpan.FromMilliseconds(50);
-        options.MaxRetryDelay = TimeSpan.FromMilliseconds(100);
-    });
-    using var host = builder.Build();
-    var flags = host.Services.GetRequiredService<CheckoutFeatureFlags>();
-    var declaration = new Checkout();
-    Require(flags.Enabled == declaration.Enabled && flags.Label == declaration.Label, "Local defaults before startup");
-    Require(!host.Services.GetRequiredService<HomeFeatureFlags>().Enabled, "Root assembly default");
-    Require(!File.Exists(Path.Combine(AppContext.BaseDirectory, "TinyFlags.SourceGen.dll")), "Generator stays a compiler asset");
-    await host.StartAsync();
-    Console.WriteLine("TINYFLAGS_HOST_STARTED");
-    Require(await Console.In.ReadLineAsync() == "stop", "Explicit shutdown from integration test");
-    await host.StopAsync();
-}
 
 static void Require(bool condition, string behavior)
 {

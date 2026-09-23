@@ -9,7 +9,6 @@
   <ItemGroup>
     <PackageReference Include="TinyFlags" Version="0.1.0-dev" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Library/Library.csproj" />
     <Compile Include="InvalidFlags.cs.template" Condition="'$(IncludeInvalidFlags)' == 'true'" />
   </ItemGroup>

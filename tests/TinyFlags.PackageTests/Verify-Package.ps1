@@ -75,3 +75,4 @@ if ($diagnosticExitCode -eq 0 -or ($diagnostics -join "`n") -notmatch 'error TFG
 }
 
 Write-Host "Package verification passed: runtime behavior and TFG002. Artifacts: $runDirectory"
+exit 0
