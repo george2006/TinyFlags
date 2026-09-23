@@ -13,7 +13,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags.Http 0.1.0-alpha.1
+      TinyFlags.Http 0.1.0-alpha.2
 
       Added
       - Reference HTTP transport: registration plus polling value synchronization with conditional GET/ETag.

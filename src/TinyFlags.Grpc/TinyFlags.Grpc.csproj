@@ -13,7 +13,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags.Grpc 0.1.0-alpha.1
+      TinyFlags.Grpc 0.1.0-alpha.2
 
       Added
       - Reference gRPC transport: registration plus real-time push value synchronization over a Watch stream.

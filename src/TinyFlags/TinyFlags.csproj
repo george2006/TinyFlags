@@ -14,7 +14,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags 0.1.0-alpha.1
+      TinyFlags 0.1.0-alpha.2
 
       Added
       - Typed feature-flag declarations via IFeatureProvider, with compile-time-generated access classes.
