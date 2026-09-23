@@ -1,9 +1,9 @@
 # TinyFlags
 
-TinyFlags is an open-source feature-flag SDK for .NET, built so changing your flag provider is a
-week of work, not a migration project. Flags are typed C# declarations you own, not rows in
-someone else's dashboard — the transport that syncs their values is a public contract, so swapping
-providers means writing a new transport, not rewriting every flag in your codebase.
+TinyFlags is an open-source feature-flag SDK for .NET. Flags are typed C# declarations you own in
+your own codebase, and the transport that syncs their values is a public contract, not a fixed
+integration — use the included HTTP or gRPC reference transport, write your own for whatever
+backend you already run, or move between them without rewriting a single flag.
 
 The code brings the flags. The server only serves their values.
 
@@ -26,9 +26,9 @@ The code brings the flags. The server only serves their values.
 
 ## Install
 
-TinyFlags is on NuGet.org, currently an early alpha (`0.1.0-alpha.2`, expect breaking changes before
-1.0). The package ID is `TinySuite.TinyFlags` — `TinyFlags` itself was already taken by another
-publisher — but the product, namespaces, and every `using TinyFlags` stay exactly `TinyFlags`:
+TinyFlags is on NuGet.org, currently an early alpha (expect breaking changes before 1.0). The
+package ID is `TinySuite.TinyFlags` — `TinyFlags` itself was already taken by another publisher —
+but the product, namespaces, and every `using TinyFlags` stay exactly `TinyFlags`:
 
 ```bash
 dotnet add package TinySuite.TinyFlags --prerelease

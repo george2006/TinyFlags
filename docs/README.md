@@ -17,7 +17,7 @@ Key capabilities (high level):
 
 ## Status
 
-`0.1.0-alpha.2`, published on NuGet.org as `TinySuite.TinyFlags` (see the top-level
+Early alpha, published on NuGet.org as `TinySuite.TinyFlags` (see the top-level
 [README](../README.md#install) for install commands and why the package ID differs from the
 product name). The NuGet client targets net8.0 so applications can use the same package before and
 after upgrading to whatever the server targets.
