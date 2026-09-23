@@ -232,4 +232,4 @@ tests/TinyFlags.SourceGen.Tests
 tests/TinyFlags.PackageTests    Verifies the packaged generator against a real restore
 ```
 
-See [the working agreement](WORKING-AGREEMENT.md) and [the slice plan](PLAN.md).
+See [the working agreement](WORKING-AGREEMENT.md).

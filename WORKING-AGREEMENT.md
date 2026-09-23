@@ -49,7 +49,7 @@ that scope without asking for the same authorization again.
 
 Then inspect the current files, implement the agreed slice, run appropriate checks, inspect
 the resulting changes, and report the outcome. Stop for the user's review and approval before
-starting another slice. Update `PLAN.md` to distinguish implementation from approval.
+starting another slice.
 
 No commits, pushes, publishing, broad formatting, or unrelated cleanup unless requested.
 
