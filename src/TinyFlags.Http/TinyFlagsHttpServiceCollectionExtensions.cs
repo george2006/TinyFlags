@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -21,16 +20,10 @@ public static class TinyFlagsHttpServiceCollectionExtensions
         var options = new TinyFlagsHttpOptions();
         configure(options);
         var snapshot = options.CreateSnapshot();
-        var existing = services.LastOrDefault(service => service.ServiceType == typeof(TinyFlagsHttpOptions));
-        if (existing is not null
-            && (existing.ImplementationInstance is not TinyFlagsHttpOptions registered || !registered.HasSameConfigurationAs(snapshot)))
-        {
-            throw new InvalidOperationException("TinyFlags HTTP transport is already configured with different settings.");
-        }
 
-        if (existing is null)
+        if (services.RegisterSingletonOnce(snapshot, static (a, b) => a.HasSameConfigurationAs(b),
+                "TinyFlags HTTP transport is already configured with different settings."))
         {
-            services.AddSingleton(snapshot);
             services.AddSingleton(new FeatureValuesPollingOptions { RefreshInterval = snapshot.RefreshInterval });
             services.AddSingleton(new FeatureSnapshotReader(snapshot.MaxSnapshotBytes));
             services.AddSingleton(provider => new TinyFlagsApiClient(snapshot,

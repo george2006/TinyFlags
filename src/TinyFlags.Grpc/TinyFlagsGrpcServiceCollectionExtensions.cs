@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -20,16 +19,10 @@ public static class TinyFlagsGrpcServiceCollectionExtensions
         var options = new TinyFlagsGrpcOptions();
         configure(options);
         var snapshot = options.CreateSnapshot();
-        var existing = services.LastOrDefault(service => service.ServiceType == typeof(TinyFlagsGrpcOptions));
-        if (existing is not null
-            && (existing.ImplementationInstance is not TinyFlagsGrpcOptions registered || !registered.HasSameConfigurationAs(snapshot)))
-        {
-            throw new InvalidOperationException("TinyFlags gRPC transport is already configured with different settings.");
-        }
 
-        if (existing is null)
+        if (services.RegisterSingletonOnce(snapshot, static (a, b) => a.HasSameConfigurationAs(b),
+                "TinyFlags gRPC transport is already configured with different settings."))
         {
-            services.AddSingleton(snapshot);
             services.AddSingleton(provider => new TinyFlagsGrpcTransport(provider.GetRequiredService<TinyFlagsGrpcOptions>()));
             services.TryAddSingleton<IFeatureDefinitionsTransport>(provider => provider.GetRequiredService<TinyFlagsGrpcTransport>());
             services.TryAddSingleton<IFeatureValuesSubscription>(provider => provider.GetRequiredService<TinyFlagsGrpcTransport>());
