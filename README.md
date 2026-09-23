@@ -1,9 +1,9 @@
 # TinyFlags
 
-TinyFlags is an open-source feature-flag SDK for .NET, built so changing your flag provider is a
-week of work, not a migration project. Flags are typed C# declarations you own, not rows in
-someone else's dashboard — the transport that syncs their values is a public contract, so swapping
-providers means writing a new transport, not rewriting every flag in your codebase.
+TinyFlags is an open-source feature-flag SDK for .NET. Flags are typed C# declarations you own in
+your own codebase, and the transport that syncs their values is a public contract, not a fixed
+integration — use the included HTTP or gRPC reference transport, write your own for whatever
+backend you already run, or move between them without rewriting a single flag.
 
 The code brings the flags. The server only serves their values.
 
