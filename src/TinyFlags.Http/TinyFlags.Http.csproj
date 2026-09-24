@@ -13,7 +13,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags.Http 0.1.0-alpha.3
+      TinyFlags.Http 0.1.0-alpha.4
 
       Added
       - Reference HTTP transport: registration plus polling value synchronization with conditional GET/ETag.
@@ -21,7 +21,8 @@
       - Strict response validation against the documented wire contract (docs/protocol.md).
 
       Fixed
-      - README/docs still said "not yet published to NuGet.org" after alpha.2 had actually shipped.
+      - The README bundled in alpha.3 was a stale snapshot from before several docs fixes; this
+        release re-packs the current README.
 
       Compatibility
       - Early alpha, matches TinyFlags's contract version.

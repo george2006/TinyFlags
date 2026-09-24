@@ -14,7 +14,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageReleaseNotes>
-      TinyFlags 0.1.0-alpha.3
+      TinyFlags 0.1.0-alpha.4
 
       Added
       - Typed feature-flag declarations via IFeatureProvider, with compile-time-generated access classes.
@@ -25,8 +25,9 @@
       - Source-generator diagnostics (TFG001-TFG005) for unsupported declarations.
 
       Fixed
-      - README/docs still said "not yet published to NuGet.org" and gave local-pack install
-        instructions after alpha.2 had actually shipped; now point at the real package id.
+      - The README bundled in alpha.3 was a stale snapshot from before several docs fixes (tone,
+        version pinning, test counts, the new reference-server page); this release re-packs the
+        current README.
 
       Compatibility
       - Early alpha: API surface, especially the transport contracts, may still change before 1.0.
