@@ -20,7 +20,7 @@ public sealed class TinyFlagsHttpOptions
 
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>How often the polling worker checks this transport for changes.</summary>
+    /// <summary>Base delay after each value request completes, with positive jitter.</summary>
     public TimeSpan RefreshInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     internal TinyFlagsHttpOptions CreateSnapshot()

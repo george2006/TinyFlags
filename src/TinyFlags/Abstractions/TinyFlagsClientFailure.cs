@@ -1,9 +1,7 @@
 namespace TinyFlags;
 
 /// <summary>
-/// Transport-agnostic classification of an unrecoverable <see cref="TinyFlagsClientException"/> -
-/// the same five buckets regardless of whether the transport speaks HTTP, gRPC, or anything else.
-/// Workers only ever see this enum, never a wire-level status code.
+/// Classifies a transport failure independently of its wire protocol.
 /// </summary>
 public enum TinyFlagsClientFailure
 {

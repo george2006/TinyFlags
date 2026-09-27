@@ -26,8 +26,7 @@ public sealed class TinyFlagsGrpcOptions
 
     internal void Validate()
     {
-        // Same rule as TinyFlagsHttpOptions, same reason: the Bearer token travels as call
-        // metadata, exactly as leakable over plain HTTP to a remote host as an Authorization header.
+        // Require TLS outside loopback to protect the bearer token.
         if (Endpoint is null || !Endpoint.IsAbsoluteUri
             || (Endpoint.Scheme != Uri.UriSchemeHttps && !(Endpoint.Scheme == Uri.UriSchemeHttp && Endpoint.IsLoopback))
             || Endpoint.UserInfo.Length != 0 || Endpoint.Query.Length != 0 || Endpoint.Fragment.Length != 0)
@@ -35,9 +34,7 @@ public sealed class TinyFlagsGrpcOptions
             throw new ArgumentException("Endpoint must be an absolute HTTPS base URI, or HTTP on loopback, without credentials, query or fragment.", nameof(Endpoint));
         }
 
-        // Same rule as TinyFlagsHttpOptions: the Bearer token travels as call metadata, exactly as
-        // leakable to logs or a misbehaving intermediary if it carries whitespace or control
-        // characters as HTTP header text would be.
+        // Credentials must be safe to send as gRPC metadata.
         if (string.IsNullOrEmpty(ApiKey) || ApiKey.Any(character => character <= ' ' || character >= '\u007f'))
         {
             throw new ArgumentException("ApiKey must contain visible ASCII characters without whitespace.", nameof(ApiKey));

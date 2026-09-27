@@ -12,12 +12,6 @@ using ProtoFeatureKind = TinyFlags.Grpc.FeatureKind;
 
 namespace TinyFlags;
 
-/// <summary>
-/// Implements both gRPC services from tinyflags.proto against one channel - registration is a
-/// single request/response call; Watch reconnects on transient failures (the contract's job, not
-/// TinyFlagsValuesWatchWorker's - it just drains whatever this yields) but lets permanent
-/// failures (bad credentials, etc.) propagate as TinyFlagsClientException so the worker stops.
-/// </summary>
 internal sealed class TinyFlagsGrpcTransport :
     IFeatureDefinitionsTransport,
     IFeatureValuesSubscription,
@@ -35,12 +29,7 @@ internal sealed class TinyFlagsGrpcTransport :
 
         if (options.Endpoint!.Scheme == Uri.UriSchemeHttp)
         {
-            // Only ever reached for loopback (Validate() rejects http elsewhere) - .NET's
-            // HttpClient otherwise silently refuses to even attempt HTTP/2 over plain http://,
-            // which fails every call with no useful error pointing at why. This switch is
-            // process-wide, not scoped to this channel - setting it here also enables cleartext
-            // HTTP/2 for any other HttpClient in the same process, an unavoidable consequence of
-            // .NET not offering a per-handler equivalent.
+            // Enables cleartext HTTP/2 for validated loopback endpoints. The switch is process-wide.
             AppContext.SetSwitch(
                 "System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport",
                 true);
@@ -117,11 +106,7 @@ internal sealed class TinyFlagsGrpcTransport :
         }
     }
 
-    /// <summary>
-    /// Reads one stream item and translates stream failures into watch outcomes.
-    /// This lives outside WatchAsync because C# does not allow yield return inside
-    /// a try block with a catch.
-    /// </summary>
+    // C# forbids yield return inside a try block with a catch.
     private async Task<(StepOutcome Outcome, FeatureValuesResult? Value)> StepAsync(
         IAsyncEnumerator<ValuesSnapshot> enumerator,
         IReadOnlyList<FeatureDefinition> catalog,

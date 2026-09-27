@@ -6,9 +6,7 @@ namespace TinyFlags;
 public static class TinyFlagsGrpcServiceCollectionExtensions
 {
     /// <summary>
-    /// Picks the gRPC transport: independent registration and real-time value push. Called from
-    /// <c>AddTinyFlags</c>'s configure callback -
-    /// <c>services.AddTinyFlags(tinyFlags => tinyFlags.UseGrpcTransport(...))</c>.
+    /// Uses gRPC for independent definitions registration and value subscriptions after host startup.
     /// </summary>
     public static TinyFlagsOptions UseGrpcTransport(this TinyFlagsOptions tinyFlags, Action<TinyFlagsGrpcOptions> configure)
     {

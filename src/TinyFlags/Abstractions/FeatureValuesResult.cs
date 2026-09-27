@@ -5,11 +5,7 @@ using System.Collections.ObjectModel;
 namespace TinyFlags;
 
 /// <summary>
-/// What a values transport hands back from one attempt: either a fresh, complete snapshot, or an
-/// explicit "nothing changed" with no snapshot at all. Returned by
-/// <see cref="IFeatureValuesTransport.GetValuesAsync"/> and yielded by
-/// <see cref="IFeatureValuesSubscription.WatchAsync"/> - the same type serves both pull and push,
-/// so a worker draining either one handles just one result shape.
+/// A complete value snapshot, or an unchanged result for a pull request.
 /// </summary>
 public sealed class FeatureValuesResult
 {
@@ -17,15 +13,12 @@ public sealed class FeatureValuesResult
     public IReadOnlyDictionary<string, object>? Values { get; }
 
     /// <summary>
-    /// True when this result carries no new snapshot - <see cref="Cursor"/> and
-    /// <see cref="Values"/> are both null in that case.
+    /// True when <see cref="Cursor"/> and <see cref="Values"/> are both null.
     /// </summary>
     public bool IsUnchanged => Cursor is null;
 
     /// <summary>
-    /// A fresh, complete snapshot. <paramref name="values"/> is defensively copied into an
-    /// immutable dictionary, so a caller mutating its own copy afterward can never affect this
-    /// result.
+    /// Creates a complete snapshot with a read-only copy of <paramref name="values"/>.
     /// </summary>
     public static FeatureValuesResult Updated(FeatureValuesCursor cursor, IReadOnlyDictionary<string, object> values)
     {
@@ -35,8 +28,7 @@ public sealed class FeatureValuesResult
     }
 
     /// <summary>
-    /// Nothing changed since the cursor the caller already had. A push transport should never
-    /// yield this - there's nothing to report until something actually changes.
+    /// Indicates no change from the accepted cursor. Push transports must not yield this result.
     /// </summary>
     public static FeatureValuesResult Unchanged() => new(null, null);
 

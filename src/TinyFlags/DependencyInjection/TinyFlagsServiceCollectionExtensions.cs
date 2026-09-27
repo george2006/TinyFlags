@@ -8,9 +8,7 @@ public static class TinyFlagsServiceCollectionExtensions
 {
     /// <summary>
     /// Registers a shared local store and applies contributions from initialized assemblies.
-    /// Local-only until <paramref name="configure"/> picks a transport, via an extension method a
-    /// transport package (e.g. TinyFlags.Http's <c>UseHttpTransport</c>) contributes on
-    /// <see cref="TinyFlagsOptions"/> - the same entry point regardless of which transport you use.
+    /// Operates locally unless <paramref name="configure"/> selects a transport.
     /// </summary>
     public static IServiceCollection AddTinyFlags(this IServiceCollection services, Action<TinyFlagsOptions>? configure = null)
     {

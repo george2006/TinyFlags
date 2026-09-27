@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 namespace TinyFlags;
 
 /// <summary>
-/// Pulls the current values for an environment, conditionally on a cursor already held locally.
-/// Called on a recurring interval by <see cref="TinyFlagsSynchronizationWorker"/>, which owns the
-/// polling loop, jitter and backoff itself — this contract only answers "what's current now."
+/// Retrieves a full snapshot or an unchanged result relative to the accepted cursor.
+/// The cursor is null before the first accepted snapshot. Each call performs one synchronization;
+/// implementations handle transient retries internally.
 /// </summary>
 public interface IFeatureValuesTransport
 {

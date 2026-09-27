@@ -4,10 +4,8 @@ using System.Threading;
 namespace TinyFlags;
 
 /// <summary>
-/// Streams value changes for an environment as they happen, instead of being polled for them.
-/// Drained by <see cref="TinyFlagsValuesWatchWorker"/>. A well-behaved implementation only ever
-/// yields real changes - it should never yield <see cref="FeatureValuesResult.Unchanged"/>, since
-/// there is nothing to report until something actually changes.
+/// Streams full value snapshots for an environment, handling transient reconnects internally.
+/// Implementations must not yield <see cref="FeatureValuesResult.Unchanged"/>.
 /// </summary>
 public interface IFeatureValuesSubscription
 {

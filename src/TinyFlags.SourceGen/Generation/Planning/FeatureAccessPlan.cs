@@ -14,9 +14,7 @@ internal sealed class FeatureAccessPlan
 
     public string ClassName => Provider.Name + "FeatureFlags";
 
-    // FeatureAccessEmitter emits property names with a verbatim "@" prefix so a flag named after a
-    // C# keyword still compiles (see WriteProperty) - stripped back out here since a source-output
-    // hint name isn't a C# identifier and doesn't need to survive that escaping.
+    // Source hint names do not need C# identifier escaping.
     public string HintName => Provider.QualifiedName.Replace("@", string.Empty) + "FeatureFlags.g.cs";
 
     public string FieldName { get; }

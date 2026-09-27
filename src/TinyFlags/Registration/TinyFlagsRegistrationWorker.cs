@@ -7,11 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace TinyFlags;
 
 /// <summary>
-/// Sends the locally-composed flag catalog through <see cref="IFeatureDefinitionsTransport"/>
-/// exactly once per host lifetime, after <see cref="IHostApplicationLifetime.ApplicationStarted"/>
-/// - never on the startup path itself, so a slow or unreachable server never delays the host.
-/// Registered by TinyFlagsOptions.UseDefinitionsTransport. Remains public for compatibility
-/// with packages that registered this worker directly.
+/// Registers the local catalog once after host startup, without blocking startup.
+/// Remains public for compatibility with direct worker registration.
 /// </summary>
 public sealed class TinyFlagsRegistrationWorker : BackgroundService
 {

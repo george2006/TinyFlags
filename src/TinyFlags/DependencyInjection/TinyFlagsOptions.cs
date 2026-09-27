@@ -4,13 +4,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace TinyFlags;
 
 /// <summary>
-/// Passed to <see cref="TinyFlagsServiceCollectionExtensions.AddTinyFlags"/>'s configure callback.
-/// Transport packages register their dependencies through <see cref="Services"/> and declare
-/// capabilities through the Use methods. Core registers the corresponding hosted workers.
+/// Configures transport capabilities and dependencies through
+/// <see cref="TinyFlagsServiceCollectionExtensions.AddTinyFlags"/>.
 /// </summary>
 public sealed class TinyFlagsOptions
 {
-    /// <summary>Registers concrete transport singletons and their dependencies.</summary>
+    /// <summary>The service collection for concrete transport singletons and their dependencies.</summary>
     public IServiceCollection Services { get; }
 
     internal TinyFlagsOptions(IServiceCollection services) => Services = services;

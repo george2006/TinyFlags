@@ -7,9 +7,7 @@ namespace TinyFlags;
 public static class TinyFlagsHttpServiceCollectionExtensions
 {
     /// <summary>
-    /// Picks the reference HTTP transport: local flag access, background registration and polling
-    /// value synchronization after host startup. Called from <c>AddTinyFlags</c>'s configure
-    /// callback - <c>services.AddTinyFlags(tinyFlags => tinyFlags.UseHttpTransport(...))</c>.
+    /// Uses HTTP for independent definitions registration and value polling after host startup.
     /// </summary>
     public static TinyFlagsOptions UseHttpTransport(this TinyFlagsOptions tinyFlags, Action<TinyFlagsHttpOptions> configure)
     {

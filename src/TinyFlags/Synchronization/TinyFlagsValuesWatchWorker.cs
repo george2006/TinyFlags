@@ -7,13 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace TinyFlags;
 
 /// <summary>
-/// Drains a <b>push</b> transport (<see cref="IFeatureValuesSubscription"/>): subscribes once
-/// after startup and republishes every yielded result immediately - the only writer to
-/// <see cref="FeatureValues"/> when the configured transport is push-based. There is no polling
-/// loop here; reconnecting a dropped stream is the transport's own job, invisible to this worker.
-/// Registered by TinyFlagsOptions.UsePushTransport; pull transports use
-/// <see cref="TinyFlagsSynchronizationWorker"/> instead. Remains public for compatibility
-/// with packages that registered this worker directly.
+/// Applies value updates after host startup. The transport owns reconnection.
+/// Remains public for compatibility with direct worker registration.
 /// </summary>
 public sealed class TinyFlagsValuesWatchWorker : BackgroundService
 {
@@ -41,7 +36,7 @@ public sealed class TinyFlagsValuesWatchWorker : BackgroundService
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            // Host shutdown is expected, including before ApplicationStarted is signalled, while watching.
+            // Host shutdown is expected, including before startup completes.
         }
     }
 
@@ -66,7 +61,6 @@ public sealed class TinyFlagsValuesWatchWorker : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // Host shutdown is expected; let the caller's cancellation handling take over.
             throw;
         }
         catch (Exception error)
