@@ -96,9 +96,15 @@ Transport contracts, in core `TinyFlags` (`Abstractions/`) — implemented by `T
 | `TinyFlagsSynchronizationWorker` | Drains `IFeatureValuesTransport` on a recurring interval — the only writer to `FeatureValues` when using a pull transport |
 | `TinyFlagsValuesWatchWorker` | Drains `IFeatureValuesSubscription`'s stream — the only writer to `FeatureValues` when using a push transport |
 
-Each transport picks which of these it wires up via its own `Use...Transport(...)` extension on
-`TinyFlagsOptions`, called from `AddTinyFlags`'s configure callback — see
-[Building a Transport](building-a-transport.md) for exactly how that plugs in.
+Each transport exposes a `Use...Transport(...)` extension on `TinyFlagsOptions`, called from
+`AddTinyFlags`'s configure callback. The package registers its concrete singleton and dependencies,
+then declares capabilities through `UseDefinitionsTransport<T>()`, `UsePullTransport<T>()`, or
+`UsePushTransport<T>()`. Core maps those capabilities to the singleton and registers the required
+workers. HTTP selects definitions plus pull; gRPC selects definitions plus push.
+
+Workers remain public for compatibility with existing transport packages. New packages use the
+capability methods and do not register workers directly. See
+[Building a Transport](building-a-transport.md) for configuration and registration examples.
 
 Server (`TinyFlags.Server` — a separate, privately-hosted reference implementation; this is its
 conceptual shape, not something you need access to it to understand):

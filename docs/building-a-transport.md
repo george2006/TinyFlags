@@ -109,10 +109,20 @@ the worker as an exception at all. Retry it inside your transport instead
 
 ## Wiring it up
 
-A transport package contributes an extension method on `TinyFlagsOptions`, not on
-`IServiceCollection` directly — that's what lets `AddTinyFlags` stay the one recognizable entry
-point regardless of which transport (or transports) a consumer picks, the same way you'd always
-recognize `AddMediatR` no matter which handlers you're registering.
+A transport package contributes an extension method on `TinyFlagsOptions`, called from
+`AddTinyFlags`. Register the concrete transport and its dependencies through `Services`, then
+declare its capabilities. TinyFlags core registers the workers that run those capabilities
+after host startup.
+
+| Method | Required transport contract | Core behavior |
+| --- | --- | --- |
+| `UseDefinitionsTransport<T>()` | `IFeatureDefinitionsTransport` | Registers definitions once after startup |
+| `UsePullTransport<T>()` | `IFeatureValuesTransport` | Polls for values using `FeatureValuesPollingOptions` |
+| `UsePushTransport<T>()` | `IFeatureValuesSubscription` | Consumes value updates from the subscription |
+
+The methods resolve an already-registered concrete singleton; they do not construct a transport.
+Using the same type for definitions and values shares that instance across both interfaces.
+For example, the wiring for a definitions-plus-pull transport is:
 
 ```csharp
 public static class MyTransportServiceCollectionExtensions
@@ -124,19 +134,31 @@ public static class MyTransportServiceCollectionExtensions
         configure(options);
 
         services.AddSingleton(provider => new MyTransport(options));
-        services.TryAddSingleton<IFeatureDefinitionsTransport>(p => p.GetRequiredService<MyTransport>());
-        services.TryAddSingleton<IFeatureValuesTransport>(p => p.GetRequiredService<MyTransport>());
+        services.AddSingleton(new FeatureValuesPollingOptions
+        {
+            RefreshInterval = TimeSpan.FromSeconds(30)
+        });
 
-        // Only add the workers whose dependency you actually satisfy - a push-only transport
-        // must not add TinyFlagsSynchronizationWorker, and vice versa, since DI would fail
-        // resolving a transport that was never registered.
-        services.AddHostedService<TinyFlagsRegistrationWorker>();
-        services.AddHostedService<TinyFlagsSynchronizationWorker>();
-
-        return tinyFlags;
+        return tinyFlags
+            .UseDefinitionsTransport<MyTransport>()
+            .UsePullTransport<MyTransport>();
     }
 }
 ```
+
+This example shows the wiring. A package should also validate and copy its configuration before
+registering dependencies. The reference HTTP and gRPC extensions use `RegisterSingletonOnce` to
+accept repeated equivalent configuration and reject conflicting settings without replacing the
+original registration. Keep concrete transport and dependency registration inside that guard.
+The capability methods themselves preserve existing interface registrations and do not duplicate
+their hosted workers when called repeatedly; they do not validate transport-specific settings
+or deduplicate your concrete transport registrations.
+
+For a definitions-plus-push transport, use `UsePushTransport<MyTransport>()` in place of
+`UsePullTransport<MyTransport>()` and omit the polling options. Select one values capability for
+the host: pull or push. The methods register what you request; they do not enforce that choice.
+Definitions registration remains independent, so it can use a different concrete transport or
+be omitted.
 
 Consumers then write:
 
@@ -145,8 +167,10 @@ services.AddTinyFlags(tinyFlags => tinyFlags.UseMyTransport(options => { ... }))
 ```
 
 `TinyFlagsRegistrationWorker`, `TinyFlagsSynchronizationWorker`, and `TinyFlagsValuesWatchWorker`
-are all public precisely so a transport package in a different assembly can call
-`AddHostedService<T>()` on them — none of the three special-cases which package is calling them.
+remain public for compatibility with packages that registered workers directly. New transport
+packages should use the capability methods; they do not need to know worker types or register
+hosted services themselves. `TinyFlagsOptions.Services` remains available for transport-specific
+dependencies.
 
 ## Security: the same rule both reference transports enforce
 

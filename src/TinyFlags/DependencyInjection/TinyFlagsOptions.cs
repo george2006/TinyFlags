@@ -5,12 +5,12 @@ namespace TinyFlags;
 
 /// <summary>
 /// Passed to <see cref="TinyFlagsServiceCollectionExtensions.AddTinyFlags"/>'s configure callback.
-/// A transport package (e.g. TinyFlags.Http) contributes its own extension method on this type -
-/// <c>tinyFlags.UseHttpTransport(...)</c> - registering directly against <see cref="Services"/>,
-/// so core never needs to know a given transport exists.
+/// Transport packages register their dependencies through <see cref="Services"/> and declare
+/// capabilities through the Use methods. Core registers the corresponding hosted workers.
 /// </summary>
 public sealed class TinyFlagsOptions
 {
+    /// <summary>Registers concrete transport singletons and their dependencies.</summary>
     public IServiceCollection Services { get; }
 
     internal TinyFlagsOptions(IServiceCollection services) => Services = services;
