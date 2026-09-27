@@ -32,20 +32,20 @@ internal sealed class TinyFlagsRetryPolicy
     public async Task<TResult> ExecuteAsync<TResult>(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
         Func<HttpResponseMessage, CancellationToken, Task<TResult>> read,
-        TimeSpan requestTimeout, ILogger logger, CancellationToken ct)
+        TimeSpan requestTimeout, ILogger logger, CancellationToken callerCancellation)
     {
         var attempt = 0;
         while (true)
         {
-            ct.ThrowIfCancellationRequested();
-            var (result, delay) = await SendOnceAsync(send, read, requestTimeout, logger, attempt, ct).ConfigureAwait(false);
+            callerCancellation.ThrowIfCancellationRequested();
+            var (result, delay) = await SendOnceAsync(send, read, requestTimeout, logger, attempt, callerCancellation).ConfigureAwait(false);
             if (delay is null)
             {
                 return result!;
             }
 
             logger.LogWarning("TinyFlags HTTP request will retry in {Delay}.", delay);
-            await WaitForRetryAsync(delay.Value, ct).ConfigureAwait(false);
+            await WaitForRetryAsync(delay.Value, callerCancellation).ConfigureAwait(false);
             attempt = Math.Min(attempt + 1, MaxBackoffAttempt);
         }
     }
@@ -75,34 +75,43 @@ internal sealed class TinyFlagsRetryPolicy
 
     public TimeSpan? GetDelay(Exception error, int attempt)
     {
-        return error is HttpRequestException or IOException or OperationCanceledException ? Backoff(attempt) : null;
+        return error is HttpRequestException or IOException ? Backoff(attempt) : null;
     }
 
     private async Task<(TResult? Result, TimeSpan? Delay)> SendOnceAsync<TResult>(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
         Func<HttpResponseMessage, CancellationToken, Task<TResult>> read,
-        TimeSpan requestTimeout, ILogger logger, int attempt, CancellationToken ct)
+        TimeSpan requestTimeout, ILogger logger, int attempt, CancellationToken callerCancellation)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(requestTimeout);
+        using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(callerCancellation);
+        attemptCancellation.CancelAfter(requestTimeout);
         try
         {
-            using var response = await send(timeout.Token).ConfigureAwait(false);
-            timeout.Token.ThrowIfCancellationRequested();
+            using var response = await send(attemptCancellation.Token).ConfigureAwait(false);
+            attemptCancellation.Token.ThrowIfCancellationRequested();
             var delay = GetDelay(response, attempt, DateTimeOffset.UtcNow);
             if (delay is null)
             {
-                var result = await read(response, timeout.Token).ConfigureAwait(false);
-                timeout.Token.ThrowIfCancellationRequested();
+                var result = await read(response, attemptCancellation.Token).ConfigureAwait(false);
+                attemptCancellation.Token.ThrowIfCancellationRequested();
                 return (result, null);
             }
 
             logger.LogWarning("TinyFlags HTTP request returned HTTP {StatusCode}.", (int)response.StatusCode);
             return (default, delay.Value);
         }
+        catch (OperationCanceledException error)
+        {
+            callerCancellation.ThrowIfCancellationRequested();
+
+            // Retry non-caller cancellation, including timeouts outside our linked token.
+            var delay = Backoff(attempt);
+            logger.LogWarning("TinyFlags HTTP request failed ({ErrorType}).", error.GetType().Name);
+            return (default, delay);
+        }
         catch (Exception error)
         {
-            ct.ThrowIfCancellationRequested();
+            callerCancellation.ThrowIfCancellationRequested();
             var delay = GetDelay(error, attempt);
             if (delay is null)
             {
