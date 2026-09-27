@@ -6,10 +6,7 @@ using ProtoFeatureKind = TinyFlags.Grpc.FeatureKind;
 
 namespace TinyFlags;
 
-/// <summary>
-/// Validates gRPC snapshots and maps their values to the domain model.
-/// Valid unknown keys are allowed; known keys must match their declared kind.
-/// </summary>
+// Valid unknown keys are allowed; known keys must match their declared kind.
 internal sealed class GrpcFeatureSnapshotReader
 {
     public FeatureValuesResult Read(ValuesSnapshot snapshot, IReadOnlyList<FeatureDefinition> catalog)

@@ -6,11 +6,7 @@ using TinyFlags.SourceGen.Model;
 
 namespace TinyFlags.SourceGen.Diagnostics;
 
-/// <summary>
-/// Rebinds a Roslyn-free <see cref="FeatureIssue"/> to the current compilation's syntax trees and
-/// produces a real <see cref="Diagnostic"/> - the inverse of SourceLocationReader, done at the
-/// output boundary so cached issues from an earlier compilation still report against current trees.
-/// </summary>
+// Cached issues must bind to the current compilation's syntax trees.
 internal static class FeatureDiagnosticReporter
 {
     public static Diagnostic Create(Compilation compilation, FeatureIssue issue)

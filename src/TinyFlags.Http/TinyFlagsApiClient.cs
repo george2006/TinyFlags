@@ -14,12 +14,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace TinyFlags;
 
-/// <summary>
-/// The reference HTTP transport: implements both registration and pull value sync against
-/// docs/protocol.md's wire contract. Owns retries (<see cref="TinyFlagsRetryPolicy"/>) and strict
-/// response validation (<see cref="FeatureSnapshotReader"/>) so neither worker ever sees a raw
-/// <see cref="HttpResponseMessage"/> or has to know this transport speaks HTTP at all.
-/// </summary>
 internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatureValuesTransport, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -91,8 +85,7 @@ internal sealed class TinyFlagsApiClient : IFeatureDefinitionsTransport, IFeatur
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
         if (current is not null)
         {
-            // The protocol fixes this as a weak entity tag (docs/protocol.md); TinyFlags.Server always
-            // sends one, and a client-sent strong tag would fail its weak-comparison expectations.
+            // The protocol specifies a weak entity tag.
             var entityTag = $"W/{FeatureSnapshotEntityTag.Format(current.EnvironmentId, current.Revision)}";
             request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Parse(entityTag));
         }

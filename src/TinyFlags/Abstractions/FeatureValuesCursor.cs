@@ -3,9 +3,7 @@ using System;
 namespace TinyFlags;
 
 /// <summary>
-/// Identifies a revision of an environment's values, independent of any transport. What a caller
-/// already has, passed back in to ask "has this changed"; what a transport hands back on a change,
-/// to pass in next time.
+/// Identifies the environment and revision of an accepted value snapshot.
 /// </summary>
 public sealed class FeatureValuesCursor
 {

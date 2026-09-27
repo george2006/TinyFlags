@@ -7,12 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace TinyFlags;
 
 /// <summary>
-/// Drains a <b>pull</b> transport (<see cref="IFeatureValuesTransport"/>): fetches once after
-/// startup, then repeats on a recurring, jittered <see cref="FeatureValuesPollingOptions.RefreshInterval"/>
-/// - the only writer to <see cref="FeatureValues"/> when the configured transport is pull-based.
-/// Registered by TinyFlagsOptions.UsePullTransport; push transports use
-/// <see cref="TinyFlagsValuesWatchWorker"/> instead. Remains public for compatibility
-/// with packages that registered this worker directly.
+/// Polls for feature values after host startup, with jitter between completed requests.
+/// Remains public for compatibility with direct worker registration.
 /// </summary>
 public sealed class TinyFlagsSynchronizationWorker : BackgroundService
 {
@@ -42,7 +38,7 @@ public sealed class TinyFlagsSynchronizationWorker : BackgroundService
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            // Host shutdown is expected, including before ApplicationStarted is signalled, during a request or a wait.
+            // Host shutdown is expected, including before startup completes.
         }
     }
 
@@ -66,7 +62,6 @@ public sealed class TinyFlagsSynchronizationWorker : BackgroundService
             }
             catch (OperationCanceledException)
             {
-                // Host shutdown is expected; let the caller's cancellation handling take over.
                 throw;
             }
             catch (Exception error)

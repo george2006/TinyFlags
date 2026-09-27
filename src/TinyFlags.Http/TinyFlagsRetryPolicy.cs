@@ -8,16 +8,8 @@ using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
 
-/// <summary>
-/// Owns retry classification and backoff for one request/read pair: which HTTP statuses and
-/// exceptions are worth retrying, how long to wait, and honoring a server's Retry-After. The
-/// caller only supplies how to send and how to read a response - this owns every attempt after
-/// the first.
-/// </summary>
 internal sealed class TinyFlagsRetryPolicy
 {
-    // Exponentiating past this would risk overflow in Backoff's Math.Pow(2, attempt) - both call
-    // sites below must stay in sync, since they cap the same growing "attempt" value.
     private const int MaxBackoffAttempt = 31;
 
     private readonly TimeSpan initialDelay;

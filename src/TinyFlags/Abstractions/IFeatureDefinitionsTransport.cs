@@ -5,9 +5,7 @@ using System.Threading.Tasks;
 namespace TinyFlags;
 
 /// <summary>
-/// Sends the locally-declared flag catalog to a server. Implemented once per host lifetime, called
-/// once at startup by <see cref="TinyFlagsRegistrationWorker"/> — there is no pull or push variant,
-/// registration is inherently a single request/response write.
+/// Sends the local flag catalog to a server. Called once per host lifetime, after startup.
 /// </summary>
 public interface IFeatureDefinitionsTransport
 {
