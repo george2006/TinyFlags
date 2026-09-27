@@ -97,6 +97,15 @@ public sealed partial class RegistrationWorkerTests
         builder.Services.AddTinyFlags();
         using var host = builder.Build();
 
+        var transport = Assert.Single(host.Services.GetServices<TinyFlagsApiClient>());
+        Assert.Same(transport, Assert.Single(host.Services.GetServices<IFeatureDefinitionsTransport>()));
+        Assert.Same(transport, Assert.Single(host.Services.GetServices<IFeatureValuesTransport>()));
+        Assert.Null(host.Services.GetService<IFeatureValuesSubscription>());
+        var workers = host.Services.GetServices<IHostedService>().ToArray();
+        Assert.Equal(2, workers.Length);
+        Assert.Single(workers.OfType<TinyFlagsRegistrationWorker>());
+        Assert.Single(workers.OfType<TinyFlagsSynchronizationWorker>());
+
         await host.StartAsync(timeout.Token);
         await GetWorker(host.Services).ExecuteTask!.WaitAsync(timeout.Token);
 

@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace TinyFlags;
 
@@ -24,11 +23,9 @@ public static class TinyFlagsGrpcServiceCollectionExtensions
                 "TinyFlags gRPC transport is already configured with different settings."))
         {
             services.AddSingleton(provider => new TinyFlagsGrpcTransport(provider.GetRequiredService<TinyFlagsGrpcOptions>()));
-            services.TryAddSingleton<IFeatureDefinitionsTransport>(provider => provider.GetRequiredService<TinyFlagsGrpcTransport>());
-            services.TryAddSingleton<IFeatureValuesSubscription>(provider => provider.GetRequiredService<TinyFlagsGrpcTransport>());
         }
-        services.AddHostedService<TinyFlagsRegistrationWorker>();
-        services.AddHostedService<TinyFlagsValuesWatchWorker>();
-        return tinyFlags;
+        return tinyFlags
+            .UseDefinitionsTransport<TinyFlagsGrpcTransport>()
+            .UsePushTransport<TinyFlagsGrpcTransport>();
     }
 }

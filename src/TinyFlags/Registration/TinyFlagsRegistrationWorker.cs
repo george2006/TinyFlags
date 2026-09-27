@@ -10,9 +10,8 @@ namespace TinyFlags;
 /// Sends the locally-composed flag catalog through <see cref="IFeatureDefinitionsTransport"/>
 /// exactly once per host lifetime, after <see cref="IHostApplicationLifetime.ApplicationStarted"/>
 /// - never on the startup path itself, so a slow or unreachable server never delays the host.
-/// Public, not internal: a transport package in a different assembly needs to call
-/// <c>AddHostedService&lt;TinyFlagsRegistrationWorker&gt;()</c> on it, and every transport shares
-/// this one worker regardless of which transport contracts it implements.
+/// Registered by TinyFlagsOptions.UseDefinitionsTransport. Remains public for compatibility
+/// with packages that registered this worker directly.
 /// </summary>
 public sealed class TinyFlagsRegistrationWorker : BackgroundService
 {

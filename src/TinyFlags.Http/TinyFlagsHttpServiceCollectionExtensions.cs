@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace TinyFlags;
@@ -28,11 +27,9 @@ public static class TinyFlagsHttpServiceCollectionExtensions
             services.AddSingleton(new FeatureSnapshotReader(snapshot.MaxSnapshotBytes));
             services.AddSingleton(provider => new TinyFlagsApiClient(snapshot,
                 provider.GetRequiredService<FeatureSnapshotReader>(), provider.GetRequiredService<ILogger<TinyFlagsApiClient>>()));
-            services.TryAddSingleton<IFeatureDefinitionsTransport>(provider => provider.GetRequiredService<TinyFlagsApiClient>());
-            services.TryAddSingleton<IFeatureValuesTransport>(provider => provider.GetRequiredService<TinyFlagsApiClient>());
         }
-        services.AddHostedService<TinyFlagsRegistrationWorker>();
-        services.AddHostedService<TinyFlagsSynchronizationWorker>();
-        return tinyFlags;
+        return tinyFlags
+            .UseDefinitionsTransport<TinyFlagsApiClient>()
+            .UsePullTransport<TinyFlagsApiClient>();
     }
 }

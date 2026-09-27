@@ -11,10 +11,9 @@ namespace TinyFlags;
 /// after startup and republishes every yielded result immediately - the only writer to
 /// <see cref="FeatureValues"/> when the configured transport is push-based. There is no polling
 /// loop here; reconnecting a dropped stream is the transport's own job, invisible to this worker.
-/// A pull-only transport must not register this worker; see
-/// <see cref="TinyFlagsSynchronizationWorker"/> for that side. Public, not internal: a transport
-/// package in a different assembly needs to call
-/// <c>AddHostedService&lt;TinyFlagsValuesWatchWorker&gt;()</c> on it.
+/// Registered by TinyFlagsOptions.UsePushTransport; pull transports use
+/// <see cref="TinyFlagsSynchronizationWorker"/> instead. Remains public for compatibility
+/// with packages that registered this worker directly.
 /// </summary>
 public sealed class TinyFlagsValuesWatchWorker : BackgroundService
 {
